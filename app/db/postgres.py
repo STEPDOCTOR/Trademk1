@@ -1,4 +1,4 @@
-"""PostgreSQL database session configuration."""
+"""PostgreSQL database session configuration with optimized pooling."""
 
 import logging
 import os
@@ -9,91 +9,81 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from app.config.settings import settings
+from app.db.optimized_postgres import optimized_db, get_optimized_db
+from app.db.query_analyzer import query_analyzer, QueryMonitoringMiddleware
 
 logger = logging.getLogger(__name__)
 
-# Global engine and session factory
+# Global engine and session factory (legacy support)
 _engine = None
 _async_session = None
+
+# Export optimized components
+__all__ = ['get_db', 'init_postgres', 'close_postgres', 'check_postgres_health',
+           'optimized_db', 'get_optimized_db', 'query_analyzer']
 
 
 def get_database_url() -> str:
     """Get properly formatted database URL for asyncpg."""
-    url = settings.DATABASE_URL
-    if not url:
-        raise ValueError("DATABASE_URL is not set")
-    
-    # Convert postgres:// to postgresql:// for compatibility
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
-    
-    # Convert to asyncpg URL if needed
-    if "postgresql://" in url and "asyncpg" not in url:
-        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    
-    return url
+    return optimized_db.get_database_url()
 
 
 async def init_postgres() -> None:
-    """Initialize PostgreSQL connection and run migrations in dev mode."""
+    """Initialize PostgreSQL connection with optimized pooling."""
     global _engine, _async_session
     
-    database_url = get_database_url()
+    # Initialize optimized database
+    await optimized_db.init()
     
-    _engine = create_async_engine(
-        database_url,
-        echo=settings.DEBUG,
-        poolclass=NullPool,  # Disable pooling for better connection management
-        future=True,
-    )
+    # Set legacy globals for compatibility
+    _engine = optimized_db.engine
+    _async_session = optimized_db.session_factory
     
-    _async_session = async_sessionmaker(
-        _engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
+    # Start query monitoring in development
+    if settings.DEBUG:
+        query_analyzer.start_monitoring()
+        monitoring_middleware = QueryMonitoringMiddleware(query_analyzer)
+        monitoring_middleware.register(_engine)
     
-    # Auto-apply migrations in development mode
-    # Note: Migrations are now handled by entrypoint.sh to ensure proper timing
+    # Start connection pool monitoring
+    if settings.ENVIRONMENT in ["development", "staging"]:
+        from app.db.optimized_postgres import ConnectionPoolMonitor
+        monitor = ConnectionPoolMonitor(optimized_db)
+        await monitor.start_monitoring(interval=300)  # Log every 5 minutes
     
-    logger.info("PostgreSQL connection initialized")
+    logger.info("Optimized PostgreSQL connection initialized")
 
 
 async def close_postgres() -> None:
     """Close PostgreSQL connection."""
     global _engine
     
+    # Stop query monitoring
+    if query_analyzer._monitoring:
+        query_analyzer.stop_monitoring()
+    
+    # Close optimized database
+    await optimized_db.close()
+    
+    # Legacy cleanup
     if _engine:
         await _engine.dispose()
         logger.info("PostgreSQL connection closed")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Get async database session."""
-    if not _async_session:
-        raise RuntimeError("Database not initialized. Call init_postgres() first.")
-    
-    async with _async_session() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+    """Get async database session (optimized version)."""
+    async with optimized_db.get_session() as session:
+        yield session
+
+
+# Legacy function for compatibility
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Legacy function - use get_db() instead."""
+    async with get_db() as session:
+        yield session
 
 
 async def check_postgres_health() -> bool:
     """Check if PostgreSQL is healthy by executing a simple query."""
-    if not _engine:
-        return False
-    
-    try:
-        async with _engine.connect() as conn:
-            await conn.execute(sa.text("SELECT 1"))
-            await conn.commit()
-        return True
-    except Exception as e:
-        logger.error(f"PostgreSQL health check failed: {e}")
-        return False
+    return await optimized_db.health_check()

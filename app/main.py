@@ -5,13 +5,32 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.middleware.rate_limiter import RateLimitMiddleware, RateLimitTiers
+from app.middleware.security import SecurityMiddleware, SecurityConfig
+from app.middleware.monitoring import RequestMonitoringMiddleware, DatabaseMonitoringMiddleware, CacheMonitoringDecorator
+from app.middleware.compression import (
+    CompressionMiddleware, ResponseOptimizationMiddleware, 
+    ContentOptimizationMiddleware, ResponseSizeLimitMiddleware
+)
+from app.monitoring.logger import setup_logging, get_main_logger
+from app.monitoring.metrics import metrics_collector, SystemMetricsCollector
+
 from app.api.health import router as health_router
 from app.api.market_data import router as market_data_router
 from app.api.trading import router as trading_router
 from app.api.strategies import router as strategies_router
+from app.api.auth import router as auth_router
+from app.api.api_keys import router as api_keys_router
+from app.api.websocket import router as websocket_router
+from app.api.admin import router as admin_router
+from app.api.portfolio import router as portfolio_router
+from app.api.preferences import router as preferences_router
+from app.api.versioning import check_api_version
+from app.api.documentation import router as docs_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
+from app.services.cache import cache_service
 from app.services.ingestor.alpaca_client import AlpacaStreamingClient
 from app.services.ingestor.binance_client import BinanceWebSocketClient
 from app.services.ingestor.ingest_worker import IngestWorker
@@ -27,14 +46,45 @@ execution_engine: Optional[ExecutionEngine] = None
 portfolio_manager: Optional[MultiStrategyPortfolioManager] = None
 background_tasks: list[asyncio.Task] = []
 
+# Initialize logging
+logger = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global market_data_queue, binance_client, alpaca_client, ingest_worker, execution_engine, portfolio_manager, background_tasks
+    global market_data_queue, binance_client, alpaca_client, ingest_worker, execution_engine, portfolio_manager, background_tasks, logger
+    
+    # Setup logging first
+    setup_logging(
+        log_level=settings.DEBUG and "DEBUG" or "INFO",
+        enable_json_logging=settings.ENVIRONMENT == "production"
+    )
+    logger = get_main_logger()
+    logger.info("Starting Trademk1 application")
+    
+    # Initialize metrics restoration
+    await metrics_collector.restore_from_redis()
+    
+    # Start system metrics collection
+    system_metrics = SystemMetricsCollector(metrics_collector)
+    await system_metrics.start_monitoring()
     
     # Initialize databases
     await init_postgres()
     await init_questdb()
+    logger.info("Databases initialized")
+    
+    # Initialize cache
+    try:
+        await cache_service.connect()
+        
+        # Apply cache monitoring
+        cache_monitor = CacheMonitoringDecorator(cache_service)
+        cache_monitor.apply_monitoring()
+        
+        logger.info("Cache service connected")
+    except Exception as e:
+        logger.error(f"Cache service connection failed: {e}")
     
     # Initialize market data ingestion
     market_data_queue = asyncio.Queue(maxsize=10000)
@@ -64,15 +114,21 @@ async def lifespan(app: FastAPI):
         portfolio_manager = MultiStrategyPortfolioManager()
         await portfolio_manager.initialize()
         # Portfolio manager runs on-demand, not as a background task
-        print("Portfolio manager initialized")
+        logger.info("Portfolio manager initialized")
     else:
-        print("Warning: Alpaca credentials not configured, skipping Alpaca client, OMS, and portfolio manager")
+        logger.warning("Alpaca credentials not configured, skipping Alpaca client, OMS, and portfolio manager")
     
-    print("Starting up...")
+    logger.info("Application startup complete")
     yield
     
     # Stop all background tasks
-    print("Shutting down...")
+    logger.info("Shutting down application")
+    
+    # Persist metrics before shutdown
+    await metrics_collector.persist_to_redis()
+    
+    # Stop system metrics collection
+    await system_metrics.stop_monitoring()
     
     # Stop clients
     if binance_client:
@@ -97,7 +153,14 @@ async def lifespan(app: FastAPI):
     await close_postgres()
     await close_questdb()
     
-    print("Shutdown complete")
+    # Close cache connection
+    try:
+        await cache_service.disconnect()
+        logger.info("Cache service disconnected")
+    except Exception as e:
+        logger.warning(f"Cache disconnect failed: {e}")
+    
+    logger.info("Application shutdown complete")
 
 
 def create_app() -> FastAPI:
@@ -107,18 +170,95 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
     
+    # Content optimization middleware (first - closest to the app)
+    app.add_middleware(
+        ContentOptimizationMiddleware,
+        minify_json=settings.ENVIRONMENT == "production",
+        remove_null_fields=True
+    )
+    
+    # Response size limiting
+    app.add_middleware(
+        ResponseSizeLimitMiddleware,
+        max_response_size=10 * 1024 * 1024,  # 10MB
+        enable_streaming_threshold=1024 * 1024  # 1MB
+    )
+    
+    # Response optimization
+    app.add_middleware(
+        ResponseOptimizationMiddleware,
+        enable_etag=True,
+        enable_caching_headers=True,
+        max_age=300
+    )
+    
+    # Compression middleware
+    compression_enabled = settings.ENVIRONMENT == "production"
+    if compression_enabled:
+        app.add_middleware(
+            CompressionMiddleware,
+            minimum_size=500,
+            compression_level=6
+        )
+    
+    # Request monitoring middleware
+    app.add_middleware(
+        RequestMonitoringMiddleware,
+        enable_detailed_logging=settings.DEBUG
+    )
+    
+    # Security middleware
+    security_config = SecurityConfig()
+    if settings.ENVIRONMENT == "production":
+        # Stricter settings for production
+        security_config.max_requests_per_second = 5
+        security_config.ddos_threshold = 50
+        security_config.max_concurrent_requests_per_ip = 3
+    
+    app.add_middleware(SecurityMiddleware, config=security_config)
+    
+    # Rate limiting middleware
+    rate_limit_config = RateLimitTiers.BASIC
+    if settings.ENVIRONMENT == "production":
+        rate_limit_config = RateLimitTiers.FREE  # More conservative for production
+    
+    app.add_middleware(
+        RateLimitMiddleware,
+        default_config=rate_limit_config,
+        exempt_paths=["/docs", "/redoc", "/openapi.json", "/api/health", "/"]
+    )
+    
+    # CORS middleware (last - furthest from the app)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["*"] if settings.ENVIRONMENT != "production" else settings.CORS_ORIGINS.split(","),
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
         allow_headers=["*"],
     )
     
+    # Core API routes
     app.include_router(health_router, prefix="/api", tags=["health"])
     app.include_router(market_data_router, prefix="/api/v1/market-data", tags=["market-data"])
+    
+    # Authentication and user management
+    app.include_router(auth_router)
+    app.include_router(api_keys_router)
+    app.include_router(preferences_router)
+    
+    # Trading and strategies
     app.include_router(trading_router)
     app.include_router(strategies_router)
+    
+    # Portfolio analytics
+    app.include_router(portfolio_router)
+    
+    # Real-time and admin
+    app.include_router(websocket_router)
+    app.include_router(admin_router)
+    
+    # Documentation and versioning
+    app.include_router(docs_router)
     
     @app.get("/")
     async def root():

@@ -36,29 +36,66 @@ docker compose down
 /app
 ├── api/              # API endpoints
 │   ├── health.py     # Health check endpoints with DB status
-│   └── market_data.py # Market data query endpoints
+│   ├── market_data.py # Market data query endpoints
+│   ├── auth.py       # Authentication (login, register, JWT)
+│   ├── api_keys.py   # API key management
+│   ├── trading.py    # Trading and order management
+│   ├── strategies.py # Strategy management and backtesting
+│   ├── portfolio.py  # Portfolio analytics and tracking
+│   ├── preferences.py # User preferences and notifications
+│   ├── websocket.py  # Real-time WebSocket streaming
+│   ├── admin.py      # Admin tools and system monitoring
+│   ├── versioning.py # API versioning and compatibility
+│   └── documentation.py # Enhanced OpenAPI documentation
+├── auth/             # Authentication system
+│   ├── dependencies.py # Auth dependencies and user validation
+│   └── security.py   # JWT tokens, password hashing, API keys
 ├── config/           # Configuration
 │   └── settings.py   # Pydantic settings from .env
 ├── db/               # Database layer
-│   ├── postgres.py   # Async PostgreSQL session management
+│   ├── postgres.py   # Optimized PostgreSQL with connection pooling
+│   ├── optimized_postgres.py # Advanced connection management
+│   ├── query_analyzer.py # Query performance analysis
 │   └── questdb.py    # QuestDB connection and tables
+├── middleware/       # HTTP middleware
+│   ├── rate_limiter.py # Rate limiting and API throttling
+│   ├── security.py   # IP filtering, DDoS protection
+│   ├── monitoring.py # Request monitoring and metrics
+│   └── compression.py # Response compression and optimization
 ├── models/           # SQLAlchemy models
 │   ├── base.py       # Base model with id, created_at, updated_at
-│   ├── user.py       # User model for authentication
+│   ├── user.py       # Enhanced user model with relationships
+│   ├── user_portfolio.py # User portfolio and preferences
+│   ├── api_key.py    # API key management model
+│   ├── audit_log.py  # Audit logging for compliance
 │   ├── symbol.py     # Symbol model for trading assets
 │   ├── config.py     # Config model for app settings
 │   ├── order.py      # Order model for trade execution
 │   └── position.py   # Position model for portfolio tracking
+├── monitoring/       # Monitoring and observability
+│   ├── logger.py     # Structured logging system
+│   └── metrics.py    # Application metrics collection
 ├── services/         # Business logic services
 │   ├── ingestor/     # Market data ingestion
 │   │   ├── models.py         # Tick dataclass and constants
 │   │   ├── binance_client.py # Binance WebSocket client
 │   │   ├── alpaca_client.py  # Alpaca streaming client
 │   │   └── ingest_worker.py  # Batch processing worker
-│   └── trading/      # Order management system
-│       ├── alpaca_client.py  # Alpaca paper trading wrapper
-│       ├── execution_engine.py # Trade signal processor
-│       └── position_manager.py # Position & P&L tracker
+│   ├── trading/      # Order management system
+│   │   ├── alpaca_client.py  # Alpaca paper trading wrapper
+│   │   ├── execution_engine.py # Trade signal processor
+│   │   └── position_manager.py # Position & P&L tracker
+│   ├── strategies/   # Trading strategy framework
+│   │   ├── base.py           # Abstract strategy base classes
+│   │   ├── sma_crossover.py  # SMA crossover strategy
+│   │   ├── momentum.py       # Momentum strategy
+│   │   ├── backtesting.py    # Backtesting engine
+│   │   ├── risk_manager.py   # Advanced risk management
+│   │   └── portfolio_manager.py # Multi-strategy management
+│   ├── cache.py      # Redis caching service
+│   ├── portfolio_analytics.py # Portfolio performance analytics
+│   ├── notifications.py # User notification system
+│   └── audit_logger.py # Audit logging service
 └── main.py           # FastAPI app with background tasks
 
 /alembic
@@ -90,7 +127,11 @@ All models inherit:
 - `updated_at`: Timestamp with timezone (auto-updated via trigger)
 
 #### Models
-- **User**: email, password_hash, is_active, is_superuser
+- **User**: Enhanced with full_name, phone, verification, relationships
+- **UserPortfolio**: Portfolio tracking with P&L and allocations
+- **UserPreferences**: User settings, notifications, trading preferences
+- **APIKey**: API key management with scoped permissions and rate limits
+- **AuditLog**: Comprehensive audit trail for compliance
 - **Symbol**: ticker, name, exchange, asset_type, is_active, metadata_json
 - **Config**: key, value, scope, description
 - **Order**: symbol, side, qty, type, status, alpaca_id, filled_price, reason
@@ -163,10 +204,26 @@ git push
 
 ## API Endpoints
 
-### Health
+### Health & Documentation
 - `GET /` - Root endpoint
 - `GET /api/health` - Basic health check
 - `GET /api/health/detailed` - Detailed health with PostgreSQL status
+- `GET /api/docs/` - Interactive API documentation
+- `GET /api/docs/openapi.json` - OpenAPI schema
+- `GET /api/docs/examples` - API usage examples
+
+### Authentication & User Management
+- `POST /api/v1/auth/register` - User registration
+- `POST /api/v1/auth/login` - User login (JWT tokens)
+- `POST /api/v1/auth/refresh` - Refresh access token
+- `GET /api/v1/auth/me` - Get current user info
+- `POST /api/v1/auth/logout` - User logout
+
+### API Keys
+- `POST /api/v1/api-keys/` - Create API key
+- `GET /api/v1/api-keys/` - List user's API keys
+- `PATCH /api/v1/api-keys/{key_id}` - Update API key
+- `DELETE /api/v1/api-keys/{key_id}` - Delete API key
 
 ### Market Data
 - `GET /api/v1/market-data/stream_status` - WebSocket connection and ingestion status
@@ -180,6 +237,41 @@ git push
 - `GET /api/v1/trading/orders/{order_id}` - Get specific order details
 - `GET /api/v1/trading/positions` - View current positions
 - `GET /api/v1/trading/portfolio` - Portfolio snapshot with P&L
+
+### Strategies
+- `POST /api/v1/strategies/create` - Create new strategy
+- `GET /api/v1/strategies/list` - List user strategies
+- `POST /api/v1/strategies/backtest` - Run strategy backtest
+- `GET /api/v1/strategies/performance/{strategy_id}` - Get strategy performance
+- `POST /api/v1/strategies/start/{strategy_id}` - Start strategy execution
+- `POST /api/v1/strategies/stop/{strategy_id}` - Stop strategy execution
+
+### Portfolio Analytics
+- `GET /api/v1/portfolio/summary` - Portfolio overview
+- `GET /api/v1/portfolio/snapshot` - Current portfolio snapshot
+- `GET /api/v1/portfolio/allocation` - Asset allocation breakdown
+- `GET /api/v1/portfolio/performance` - Performance metrics
+- `GET /api/v1/portfolio/analytics/risk-metrics` - Risk analysis
+
+### User Preferences & Notifications
+- `GET /api/v1/preferences/` - Get user preferences
+- `PATCH /api/v1/preferences/` - Update user preferences
+- `GET /api/v1/preferences/notifications` - Get notifications
+- `POST /api/v1/preferences/notifications/{id}/read` - Mark notification read
+- `POST /api/v1/preferences/price-alerts` - Create price alert
+
+### WebSocket Streaming
+- `WS /ws/stream` - Real-time data streaming
+  - Channels: market data, orders, positions, portfolio, notifications
+  - Authentication via JWT token in query parameter
+
+### Admin & Monitoring (Superuser only)
+- `GET /api/v1/admin/health` - System health status
+- `GET /api/v1/admin/database/stats` - Database statistics
+- `GET /api/v1/admin/metrics/detailed` - Application metrics
+- `GET /api/v1/admin/security/stats` - Security statistics
+- `POST /api/v1/admin/security/block-ip` - Block IP address
+- `GET /api/v1/admin/rate-limits/stats` - Rate limiting statistics
 
 ## Environment Variables
 
@@ -258,26 +350,53 @@ Configure in `.env` file (see `.env.example`):
 - ✅ Strategy API endpoints
 - ✅ Comprehensive strategy documentation
 
-## TODO/Roadmap
+### Phase 4 - Enterprise Features (Complete)
+- ✅ **Authentication & Security**
+  - ✅ JWT authentication with refresh tokens
+  - ✅ User registration and login system
+  - ✅ Role-based access control (RBAC)
+  - ✅ API key management with scoped permissions
+  - ✅ Audit logging for compliance
+- ✅ **Performance & Scalability**
+  - ✅ Redis caching layer for performance optimization
+  - ✅ Connection pooling and query optimization
+  - ✅ Rate limiting and API throttling
+  - ✅ DDoS protection and IP filtering
+  - ✅ Data compression and response optimization
+- ✅ **Real-time & Analytics**
+  - ✅ WebSocket API for real-time data streaming
+  - ✅ Portfolio tracking and analytics
+  - ✅ Performance metrics (Sharpe, Sortino, VaR)
+  - ✅ Risk analysis and attribution
+  - ✅ User preferences and notification system
+- ✅ **Monitoring & Operations**
+  - ✅ Comprehensive logging and monitoring
+  - ✅ Application metrics collection
+  - ✅ Admin tools and system monitoring
+  - ✅ Security violation tracking
+  - ✅ Query performance analysis
+- ✅ **Developer Experience**
+  - ✅ API versioning and backward compatibility
+  - ✅ Enhanced OpenAPI documentation
+  - ✅ Usage examples and migration guides
+  - ✅ Interactive documentation interface
 
-### Phase 4 - User Management
-- [ ] User authentication (JWT)
-- [ ] Role-based access control
-- [ ] API key management
-- [ ] User portfolio tracking
+## Production Readiness
 
-### Phase 5 - Real-time Features
-- [ ] WebSocket API for live data streaming
-- [ ] Real-time position updates
-- [ ] Price alerts system
-- [ ] Live strategy performance metrics
+### Enterprise-Grade Features Completed ✅
+- **Security**: Multi-layer authentication, audit trails, rate limiting
+- **Performance**: Connection pooling, caching, compression, optimization
+- **Scalability**: Redis pub/sub, WebSocket streaming, horizontal scaling ready
+- **Monitoring**: Comprehensive metrics, logging, admin dashboards
+- **Compliance**: Complete audit trails, security monitoring
+- **Developer Experience**: Full API documentation, versioning, examples
 
-### Infrastructure Improvements
-- [ ] Redis health checks and caching layer
-- [ ] API rate limiting
-- [ ] Monitoring and alerting (Prometheus/Grafana)
-- [ ] Admin dashboard
-- [ ] Horizontal scaling support
+### Future Enhancements (Optional)
+- Email notification delivery (SMTP integration)
+- Advanced charting and technical indicators
+- Mobile app API endpoints
+- Third-party broker integrations beyond Alpaca
+- Machine learning strategy recommendations
 
 ## Order Management System (OMS)
 
