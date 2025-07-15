@@ -239,7 +239,7 @@ Configure in `.env` file (see `.env.example`):
 - ✅ Background task management in FastAPI
 - ✅ Automatic reconnection with exponential backoff
 
-### Phase 3 - Order Management System (Milestone 1)
+### Phase 3 - Trading Engine (Complete)
 - ✅ Order management system with Alpaca integration
 - ✅ Position tracking and P&L calculation
 - ✅ Risk management rules (position limits, order size)
@@ -248,14 +248,17 @@ Configure in `.env` file (see `.env.example`):
 - ✅ Trading API endpoints
 - ✅ Comprehensive OMS tests
 - ✅ Market hours validation
+- ✅ Trading strategies framework with base classes
+- ✅ Example strategies (SMA Crossover, Momentum)
+- ✅ Strategy backtesting engine with metrics
+- ✅ Advanced risk management (drawdown, correlation, VaR)
+- ✅ Multi-strategy portfolio management
+- ✅ Performance analytics and reporting
+- ✅ Strategy configuration system with database storage
+- ✅ Strategy API endpoints
+- ✅ Comprehensive strategy documentation
 
 ## TODO/Roadmap
-
-### Phase 3 - Trading Engine (Remaining)
-- [ ] Trading strategies framework
-- [ ] Strategy backtesting engine
-- [ ] Advanced risk management (drawdown, correlation)
-- [ ] Multi-strategy portfolio management
 
 ### Phase 4 - User Management
 - [ ] User authentication (JWT)
@@ -281,8 +284,8 @@ Configure in `.env` file (see `.env.example`):
 ### Quick Start
 ```bash
 # Set Alpaca credentials in .env
-ALPACA_API_KEY=your_paper_api_key
-ALPACA_API_SECRET=your_paper_api_secret
+ALPACA_API_KEY=PKQ5Q0YC4N4ODIX1JLXV
+ALPACA_API_SECRET=aBUXxQpzLRQm89IWJgyDUd51kGM0rsB9xM3kHvuq
 
 # Start services
 docker compose up --build
@@ -306,3 +309,41 @@ curl http://localhost:8000/api/v1/trading/positions | jq
 4. **WebSocket Integration**: Real-time order status updates from Alpaca
 
 See `OMS_README.md` for detailed documentation.
+
+## Trading Strategy Framework
+
+### Quick Start
+```bash
+# Create a new strategy
+curl -X POST http://localhost:8000/api/v1/strategies/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "strategy_type": "sma_crossover",
+    "name": "BTC SMA Strategy",
+    "symbols": ["BTCUSDT"],
+    "parameters": {"fast_period": 10, "slow_period": 30},
+    "allocation": 0.25
+  }'
+
+# Run backtest
+curl -X POST http://localhost:8000/api/v1/strategies/backtest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "strategy_id": "sma_crossover_20241215_120000",
+    "start_date": "2024-01-01T00:00:00",
+    "end_date": "2024-12-01T00:00:00"
+  }'
+
+# View strategies
+curl http://localhost:8000/api/v1/strategies/list | jq
+```
+
+### Strategy Components
+1. **Base Framework**: Abstract classes for strategy development
+2. **Example Strategies**: SMA Crossover and Momentum strategies
+3. **Backtesting Engine**: Historical simulation with comprehensive metrics
+4. **Risk Manager**: Advanced drawdown, correlation, and VaR controls
+5. **Portfolio Manager**: Multi-strategy allocation and rebalancing
+6. **Performance Analytics**: Sharpe ratio, drawdown analysis, trade statistics
+
+See `STRATEGY_README.md` for detailed documentation.

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.health import router as health_router
 from app.api.market_data import router as market_data_router
 from app.api.trading import router as trading_router
+from app.api.strategies import router as strategies_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
@@ -15,6 +16,7 @@ from app.services.ingestor.alpaca_client import AlpacaStreamingClient
 from app.services.ingestor.binance_client import BinanceWebSocketClient
 from app.services.ingestor.ingest_worker import IngestWorker
 from app.services.trading.execution_engine import ExecutionEngine
+from app.services.strategies.portfolio_manager import MultiStrategyPortfolioManager
 
 # Global references to background tasks
 market_data_queue: Optional[asyncio.Queue] = None
@@ -22,12 +24,13 @@ binance_client: Optional[BinanceWebSocketClient] = None
 alpaca_client: Optional[AlpacaStreamingClient] = None
 ingest_worker: Optional[IngestWorker] = None
 execution_engine: Optional[ExecutionEngine] = None
+portfolio_manager: Optional[MultiStrategyPortfolioManager] = None
 background_tasks: list[asyncio.Task] = []
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global market_data_queue, binance_client, alpaca_client, ingest_worker, execution_engine, background_tasks
+    global market_data_queue, binance_client, alpaca_client, ingest_worker, execution_engine, portfolio_manager, background_tasks
     
     # Initialize databases
     await init_postgres()
@@ -56,8 +59,14 @@ async def lifespan(app: FastAPI):
         await execution_engine.initialize()
         background_tasks.append(asyncio.create_task(execution_engine.run()))
         print("OMS execution engine started")
+        
+        # Initialize and start portfolio manager
+        portfolio_manager = MultiStrategyPortfolioManager()
+        await portfolio_manager.initialize()
+        # Portfolio manager runs on-demand, not as a background task
+        print("Portfolio manager initialized")
     else:
-        print("Warning: Alpaca credentials not configured, skipping Alpaca client and OMS")
+        print("Warning: Alpaca credentials not configured, skipping Alpaca client, OMS, and portfolio manager")
     
     print("Starting up...")
     yield
@@ -74,6 +83,8 @@ async def lifespan(app: FastAPI):
         await ingest_worker.stop()
     if execution_engine:
         await execution_engine.stop()
+    if portfolio_manager:
+        await portfolio_manager.stop()
         
     # Cancel background tasks
     for task in background_tasks:
@@ -107,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router, prefix="/api", tags=["health"])
     app.include_router(market_data_router, prefix="/api/v1/market-data", tags=["market-data"])
     app.include_router(trading_router)
+    app.include_router(strategies_router)
     
     @app.get("/")
     async def root():
