@@ -8,17 +8,25 @@ Trademk1 - An autonomous real-time trading platform for U.S. stocks and top-15 c
 
 ## Development Setup
 
-### Virtual Environment
-The project uses a Python virtual environment located at `.venv/`. Always ensure the virtual environment is activated before running any Python commands:
+### Quick Start Options
+
+#### Option 1: Automated Setup (Recommended)
 ```bash
-source .venv/bin/activate
+# Interactive setup with user creation and optional demo strategy
+./autostart.sh
+
+# Or use Make commands
+make setup  # First-time setup
+make start  # Start services
 ```
 
-### Python Version
-This project uses Python 3.12.
+#### Option 2: Quick Demo Mode
+```bash
+# Zero-configuration demo mode (no Alpaca keys required)
+./quickstart.sh
+```
 
-### Docker Setup
-The application runs in Docker with PostgreSQL and Redis:
+#### Option 3: Manual Docker Setup
 ```bash
 # Start all services (migrations run automatically)
 docker compose up --build
@@ -29,6 +37,15 @@ docker compose watch
 # Stop all services
 docker compose down
 ```
+
+### Helper Scripts
+- `autostart.sh` - Interactive setup with user creation
+- `quickstart.sh` - Zero-config demo mode
+- `api.sh` - API helper for common operations
+- `Makefile` - Comprehensive project management
+
+### Python Version
+This project uses Python 3.12.
 
 ## Project Structure
 
@@ -202,6 +219,42 @@ git commit -m "Description of changes"
 git push
 ```
 
+## Quick Reference
+
+### Using Make Commands
+```bash
+# Service management
+make start      # Start all services
+make stop       # Stop services
+make restart    # Restart services
+make status     # Check health
+make logs       # Follow logs
+
+# Development
+make dev        # Start with auto-reload
+make test       # Run tests
+make shell      # App container shell
+make db-shell   # PostgreSQL shell
+make redis-cli  # Redis CLI
+
+# Trading operations
+make positions  # View positions
+make orders     # View orders
+make portfolio  # Portfolio summary
+make strategies # List strategies
+```
+
+### Using API Helper
+```bash
+# After running autostart.sh or make setup
+./api.sh positions              # View positions
+./api.sh orders                 # View orders
+./api.sh portfolio              # Portfolio summary
+./api.sh strategies             # List strategies
+./api.sh buy AAPL 10           # Buy 10 shares of AAPL
+./api.sh sell BTCUSDT 0.1      # Sell 0.1 Bitcoin
+```
+
 ## API Endpoints
 
 ### Health & Documentation
@@ -350,7 +403,7 @@ Configure in `.env` file (see `.env.example`):
 - ✅ Strategy API endpoints
 - ✅ Comprehensive strategy documentation
 
-### Phase 4 - Enterprise Features (Complete)
+### Phase 4 - User Management & Infrastructure (Complete)
 - ✅ **Authentication & Security**
   - ✅ JWT authentication with refresh tokens
   - ✅ User registration and login system
@@ -380,6 +433,35 @@ Configure in `.env` file (see `.env.example`):
   - ✅ Enhanced OpenAPI documentation
   - ✅ Usage examples and migration guides
   - ✅ Interactive documentation interface
+  - ✅ One-click startup scripts (autostart.sh, quickstart.sh)
+  - ✅ API helper script (api.sh)
+  - ✅ Comprehensive Makefile
+  - ✅ Development-optimized Docker Compose
+
+## TODO/Roadmap
+
+### Phase 5 - Advanced Features (Next)
+- [ ] Machine learning price prediction models
+- [ ] Sentiment analysis from news/social media
+- [ ] Advanced order types (stop-loss, trailing stop)
+- [ ] Multi-exchange arbitrage detection
+- [ ] Custom technical indicators framework
+- [ ] Strategy marketplace
+
+### Phase 6 - Enterprise Features
+- [ ] Multi-tenant support
+- [ ] Advanced compliance reporting
+- [ ] Integration with traditional brokers
+- [ ] Custom webhook integrations
+- [ ] White-label support
+
+### Infrastructure Enhancements
+- [ ] Kubernetes deployment manifests
+- [ ] Prometheus/Grafana monitoring stack
+- [ ] ElasticSearch for log aggregation
+- [ ] CDN integration for global access
+- [ ] Disaster recovery and backup automation
+- [ ] Multi-region deployment support
 
 ## Production Readiness
 

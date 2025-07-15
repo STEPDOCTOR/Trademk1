@@ -1,0 +1,135 @@
+# Development-optimized Docker Compose with auto-reload and debugging
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/app.dockerfile
+    container_name: trademk1-app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      questdb:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/trademk1
+      - REDIS_URL=redis://redis:6379
+      - QUESTDB_URL=postgresql://admin:quest@questdb:8812/qdb
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=development
+      - DEBUG=True
+    volumes:
+      - ./app:/code/app:ro
+      - ./tests:/code/tests:ro
+      - ./alembic:/code/alembic:ro
+      - ./.env:/code/.env:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - trademk1-network
+
+  db:
+    image: postgres:15-alpine
+    container_name: trademk1-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=trademk1
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - trademk1-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: trademk1-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - trademk1-network
+
+  questdb:
+    image: questdb/questdb:7.3.10
+    container_name: trademk1-questdb
+    ports:
+      - "9000:9000"    # Web Console
+      - "9009:9009"    # InfluxDB line protocol
+      - "8812:8812"    # PostgreSQL wire protocol
+    volumes:
+      - questdb_data:/var/lib/questdb
+    environment:
+      - QDB_TELEMETRY_ENABLED=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - trademk1-network
+
+  # Optional: Adminer for database management
+  adminer:
+    image: adminer:latest
+    container_name: trademk1-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=db
+    depends_on:
+      - db
+    networks:
+      - trademk1-network
+    profiles:
+      - debug
+
+  # Optional: Redis Commander for Redis management  
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: trademk1-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - trademk1-network
+    profiles:
+      - debug
+
+volumes:
+  postgres_data:
+  redis_data:
+  questdb_data:
+
+networks:
+  trademk1-network:
+    driver: bridge
