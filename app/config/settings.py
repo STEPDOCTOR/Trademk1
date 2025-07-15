@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     
     APP_NAME: str = "Trademk1"
     DEBUG: bool = False
+    ENVIRONMENT: str = "production"
     
     DATABASE_URL: Optional[str] = None
     REDIS_URL: Optional[str] = None

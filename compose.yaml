@@ -11,16 +11,22 @@ services:
         - action: sync
           path: ./tests
           target: /app/tests
+        - action: sync
+          path: ./alembic
+          target: /app/alembic
         - action: rebuild
           path: ./requirements.txt
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/trademk1
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/trademk1
       - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
     volumes:
-      - ./app:/app/app
-      - ./tests:/app/tests
+      # Only mount files that aren't being watched
+      - ./alembic.ini:/app/alembic.ini
+      - ./docker/entrypoint.sh:/app/docker/entrypoint.sh
+      - ./docker/wait-for-it.sh:/app/docker/wait-for-it.sh
     depends_on:
       - db
       - redis

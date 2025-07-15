@@ -4,16 +4,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
 from app.config.settings import settings
+from app.db.postgres import close_postgres, init_postgres
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # TODO: Initialize database connection
+    # Initialize database connection
+    await init_postgres()
     # TODO: Initialize Redis connection
     # TODO: Initialize other services
     print("Starting up...")
     yield
-    # TODO: Close database connection
+    # Close database connection
+    await close_postgres()
     # TODO: Close Redis connection
     # TODO: Cleanup other services
     print("Shutting down...")
