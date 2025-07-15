@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     ALPACA_API_KEY: Optional[str] = None
     ALPACA_API_SECRET: Optional[str] = None
     ALPACA_BASE_URL: str = "https://paper-api.alpaca.markets"
+    ALPACA_PAPER_BASE_URL: str = "https://paper-api.alpaca.markets"
+    ALPACA_KEY_ID: Optional[str] = None
+    ALPACA_SECRET_KEY: Optional[str] = None
 
 
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    """Get application settings."""
+    return settings

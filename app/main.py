@@ -7,24 +7,27 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.health import router as health_router
 from app.api.market_data import router as market_data_router
+from app.api.trading import router as trading_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
 from app.services.ingestor.alpaca_client import AlpacaStreamingClient
 from app.services.ingestor.binance_client import BinanceWebSocketClient
 from app.services.ingestor.ingest_worker import IngestWorker
+from app.services.trading.execution_engine import ExecutionEngine
 
 # Global references to background tasks
 market_data_queue: Optional[asyncio.Queue] = None
 binance_client: Optional[BinanceWebSocketClient] = None
 alpaca_client: Optional[AlpacaStreamingClient] = None
 ingest_worker: Optional[IngestWorker] = None
+execution_engine: Optional[ExecutionEngine] = None
 background_tasks: list[asyncio.Task] = []
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global market_data_queue, binance_client, alpaca_client, ingest_worker, background_tasks
+    global market_data_queue, binance_client, alpaca_client, ingest_worker, execution_engine, background_tasks
     
     # Initialize databases
     await init_postgres()
@@ -47,8 +50,14 @@ async def lifespan(app: FastAPI):
     # Only start Alpaca if credentials are configured
     if settings.ALPACA_API_KEY and settings.ALPACA_API_SECRET:
         background_tasks.append(asyncio.create_task(alpaca_client.run()))
+        
+        # Initialize and start execution engine
+        execution_engine = ExecutionEngine()
+        await execution_engine.initialize()
+        background_tasks.append(asyncio.create_task(execution_engine.run()))
+        print("OMS execution engine started")
     else:
-        print("Warning: Alpaca credentials not configured, skipping Alpaca client")
+        print("Warning: Alpaca credentials not configured, skipping Alpaca client and OMS")
     
     print("Starting up...")
     yield
@@ -63,6 +72,8 @@ async def lifespan(app: FastAPI):
         await alpaca_client.stop()
     if ingest_worker:
         await ingest_worker.stop()
+    if execution_engine:
+        await execution_engine.stop()
         
     # Cancel background tasks
     for task in background_tasks:
@@ -95,6 +106,7 @@ def create_app() -> FastAPI:
     
     app.include_router(health_router, prefix="/api", tags=["health"])
     app.include_router(market_data_router, prefix="/api/v1/market-data", tags=["market-data"])
+    app.include_router(trading_router)
     
     @app.get("/")
     async def root():

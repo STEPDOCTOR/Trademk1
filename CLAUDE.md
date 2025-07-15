@@ -46,18 +46,25 @@ docker compose down
 │   ├── base.py       # Base model with id, created_at, updated_at
 │   ├── user.py       # User model for authentication
 │   ├── symbol.py     # Symbol model for trading assets
-│   └── config.py     # Config model for app settings
+│   ├── config.py     # Config model for app settings
+│   ├── order.py      # Order model for trade execution
+│   └── position.py   # Position model for portfolio tracking
 ├── services/         # Business logic services
-│   └── ingestor/     # Market data ingestion
-│       ├── models.py         # Tick dataclass and constants
-│       ├── binance_client.py # Binance WebSocket client
-│       ├── alpaca_client.py  # Alpaca streaming client
-│       └── ingest_worker.py  # Batch processing worker
+│   ├── ingestor/     # Market data ingestion
+│   │   ├── models.py         # Tick dataclass and constants
+│   │   ├── binance_client.py # Binance WebSocket client
+│   │   ├── alpaca_client.py  # Alpaca streaming client
+│   │   └── ingest_worker.py  # Batch processing worker
+│   └── trading/      # Order management system
+│       ├── alpaca_client.py  # Alpaca paper trading wrapper
+│       ├── execution_engine.py # Trade signal processor
+│       └── position_manager.py # Position & P&L tracker
 └── main.py           # FastAPI app with background tasks
 
 /alembic
 ├── versions/         # Database migrations
-│   └── 0001_initial.py # Initial schema with triggers
+│   ├── 0001_initial.py # Initial schema with triggers
+│   └── 0002_orders_positions.py # OMS tables and risk configs
 └── env.py            # Async migration configuration
 
 /docker
@@ -68,7 +75,8 @@ docker compose down
 /tests
 ├── test_health.py    # Health endpoint tests
 ├── test_db_models.py # Database CRUD tests
-└── test_market_ingestion.py # WebSocket ingestion tests
+├── test_market_ingestion.py # WebSocket ingestion tests
+└── test_oms.py       # Order management system tests
 ```
 
 ## Database Schema
@@ -85,6 +93,8 @@ All models inherit:
 - **User**: email, password_hash, is_active, is_superuser
 - **Symbol**: ticker, name, exchange, asset_type, is_active, metadata_json
 - **Config**: key, value, scope, description
+- **Order**: symbol, side, qty, type, status, alpaca_id, filled_price, reason
+- **Position**: symbol, qty, avg_price, unrealized_pnl, realized_pnl, market_value
 
 ### QuestDB (Time-Series Market Data)
 
@@ -103,6 +113,7 @@ pytest tests/
 # Run specific test file
 pytest tests/test_db_models.py -v
 pytest tests/test_market_ingestion.py -v
+pytest tests/test_oms.py -v
 
 # Run with coverage
 pytest tests/ --cov=app
@@ -163,6 +174,13 @@ git push
 - `GET /api/v1/market-data/latest/{symbol}` - Latest tick for a symbol
 - `GET /api/v1/market-data/symbols` - List of actively traded symbols
 
+### Trading (OMS)
+- `POST /api/v1/trading/signal` - Submit trade signal for execution
+- `GET /api/v1/trading/orders` - List orders with filtering
+- `GET /api/v1/trading/orders/{order_id}` - Get specific order details
+- `GET /api/v1/trading/positions` - View current positions
+- `GET /api/v1/trading/portfolio` - Portfolio snapshot with P&L
+
 ## Environment Variables
 
 Configure in `.env` file (see `.env.example`):
@@ -179,11 +197,14 @@ Configure in `.env` file (see `.env.example`):
 - `REDIS_URL` - Redis connection
 - `QUESTDB_URL` - QuestDB connection for time-series data
 
-### Market Data
+### Market Data & Trading
 - `BINANCE_API_URL` - Binance WebSocket endpoint
-- `ALPACA_API_KEY` - Alpaca API key (for US stocks)
+- `ALPACA_API_KEY` - Alpaca API key (required for OMS)
 - `ALPACA_API_SECRET` - Alpaca secret key
 - `ALPACA_BASE_URL` - Alpaca API base URL
+- `ALPACA_PAPER_BASE_URL` - Paper trading endpoint
+- `ALPACA_KEY_ID` - Alpaca key ID (same as API_KEY)
+- `ALPACA_SECRET_KEY` - Alpaca secret (same as API_SECRET)
 
 ## Docker Compose Configuration
 
@@ -218,14 +239,23 @@ Configure in `.env` file (see `.env.example`):
 - ✅ Background task management in FastAPI
 - ✅ Automatic reconnection with exponential backoff
 
+### Phase 3 - Order Management System (Milestone 1)
+- ✅ Order management system with Alpaca integration
+- ✅ Position tracking and P&L calculation
+- ✅ Risk management rules (position limits, order size)
+- ✅ Redis-based signal processing
+- ✅ Real-time order status updates via WebSocket
+- ✅ Trading API endpoints
+- ✅ Comprehensive OMS tests
+- ✅ Market hours validation
+
 ## TODO/Roadmap
 
-### Phase 3 - Trading Engine
-- [ ] Order management system
-- [ ] Position tracking and P&L calculation
-- [ ] Risk management rules
+### Phase 3 - Trading Engine (Remaining)
 - [ ] Trading strategies framework
-- [ ] Backtesting engine
+- [ ] Strategy backtesting engine
+- [ ] Advanced risk management (drawdown, correlation)
+- [ ] Multi-strategy portfolio management
 
 ### Phase 4 - User Management
 - [ ] User authentication (JWT)
@@ -245,3 +275,34 @@ Configure in `.env` file (see `.env.example`):
 - [ ] Monitoring and alerting (Prometheus/Grafana)
 - [ ] Admin dashboard
 - [ ] Horizontal scaling support
+
+## Order Management System (OMS)
+
+### Quick Start
+```bash
+# Set Alpaca credentials in .env
+ALPACA_API_KEY=your_paper_api_key
+ALPACA_API_SECRET=your_paper_api_secret
+
+# Start services
+docker compose up --build
+
+# Submit a trade signal
+curl -X POST http://localhost:8000/api/v1/trading/signal \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "AAPL", "side": "buy", "qty": 10, "reason": "Test trade"}'
+
+# View orders
+curl http://localhost:8000/api/v1/trading/orders | jq
+
+# View positions
+curl http://localhost:8000/api/v1/trading/positions | jq
+```
+
+### OMS Components
+1. **Execution Engine**: Processes signals from Redis, validates risk limits, submits to Alpaca
+2. **Position Manager**: Tracks positions, calculates P&L, updates prices from QuestDB
+3. **Risk Management**: Configurable limits for position size and order quantities
+4. **WebSocket Integration**: Real-time order status updates from Alpaca
+
+See `OMS_README.md` for detailed documentation.

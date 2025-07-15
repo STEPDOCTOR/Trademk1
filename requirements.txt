@@ -12,3 +12,5 @@ asyncpg==0.29.0
 psycopg2-binary==2.9.9
 websockets==12.0
 aiohttp==3.9.1
+redis==5.0.1
+alpaca-py==0.13.3
