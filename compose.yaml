@@ -22,6 +22,11 @@ services:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/trademk1
       - REDIS_URL=redis://redis:6379
       - ENVIRONMENT=development
+      - QUESTDB_URL=postgresql://admin:quest@questdb:8812/qdb
+      - BINANCE_API_URL=wss://stream.binance.com:9443
+      - ALPACA_API_KEY=${ALPACA_API_KEY:-}
+      - ALPACA_API_SECRET=${ALPACA_API_SECRET:-}
+      - ALPACA_BASE_URL=https://paper-api.alpaca.markets
     volumes:
       # Only mount files that aren't being watched
       - ./alembic.ini:/app/alembic.ini
@@ -30,6 +35,7 @@ services:
     depends_on:
       - db
       - redis
+      - questdb
     networks:
       - trademk1-network
 
@@ -53,8 +59,23 @@ services:
     networks:
       - trademk1-network
 
+  questdb:
+    image: questdb/questdb:7.3.10
+    container_name: trademk1-questdb
+    ports:
+      - "9000:9000"    # REST API and Web Console
+      - "9009:9009"    # InfluxDB line protocol
+      - "8812:8812"    # PostgreSQL wire protocol
+    volumes:
+      - questdb_data:/root/.questdb
+    environment:
+      - QDB_TELEMETRY_ENABLED=false
+    networks:
+      - trademk1-network
+
 volumes:
   postgres_data:
+  questdb_data:
 
 networks:
   trademk1-network:
