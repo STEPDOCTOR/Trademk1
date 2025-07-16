@@ -24,14 +24,14 @@ router = APIRouter(prefix="/api/v1/preferences", tags=["preferences"])
 # Request/Response models
 class UserPreferencesUpdate(BaseModel):
     """User preferences update request."""
-    default_order_type: Optional[str] = Field(None, regex="^(market|limit|stop|stop_limit)$")
-    default_time_in_force: Optional[str] = Field(None, regex="^(day|gtc|ioc|fok)$")
-    risk_level: Optional[str] = Field(None, regex="^(low|medium|high)$")
+    default_order_type: Optional[str] = Field(None, pattern="^(market|limit|stop|stop_limit)$")
+    default_time_in_force: Optional[str] = Field(None, pattern="^(day|gtc|ioc|fok)$")
+    risk_level: Optional[str] = Field(None, pattern="^(low|medium|high)$")
     email_notifications: Optional[bool] = None
-    theme: Optional[str] = Field(None, regex="^(light|dark|auto)$")
+    theme: Optional[str] = Field(None, pattern="^(light|dark|auto)$")
     timezone: Optional[str] = None
-    language: Optional[str] = Field(None, regex="^(en|es|fr|de|zh|ja)$")
-    currency: Optional[str] = Field(None, regex="^(USD|EUR|GBP|JPY|CAD|AUD)$")
+    language: Optional[str] = Field(None, pattern="^(en|es|fr|de|zh|ja)$")
+    currency: Optional[str] = Field(None, pattern="^(USD|EUR|GBP|JPY|CAD|AUD)$")
 
 
 class UserPreferencesResponse(BaseModel):
@@ -62,8 +62,8 @@ class NotificationPreferencesUpdate(BaseModel):
     security_alerts: bool = True
     email_enabled: bool = True
     push_enabled: bool = True
-    quiet_hours_start: Optional[str] = Field(None, regex="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
-    quiet_hours_end: Optional[str] = Field(None, regex="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+    quiet_hours_start: Optional[str] = Field(None, pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+    quiet_hours_end: Optional[str] = Field(None, pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
 
 
 class NotificationResponse(BaseModel):
@@ -92,7 +92,7 @@ class PriceAlertRequest(BaseModel):
     """Price alert creation request."""
     symbol: str = Field(..., min_length=1, max_length=20)
     target_price: float = Field(..., gt=0)
-    condition: str = Field(..., regex="^(above|below)$")
+    condition: str = Field(..., pattern="^(above|below)$")
     enabled: bool = True
 
 

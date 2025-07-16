@@ -2,10 +2,10 @@
 from sqlalchemy import Column, String, Float, Integer, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
-from app.models.base import BaseModel
+from app.models.base import Base
 
 
-class Position(BaseModel):
+class Position(Base):
     """Position model for tracking current portfolio positions."""
     
     __tablename__ = "positions"

@@ -27,6 +27,7 @@ from app.api.portfolio import router as portfolio_router
 from app.api.preferences import router as preferences_router
 from app.api.versioning import check_api_version
 from app.api.documentation import router as docs_router
+from app.api.autonomous import router as autonomous_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
@@ -36,6 +37,9 @@ from app.services.ingestor.binance_client import BinanceWebSocketClient
 from app.services.ingestor.ingest_worker import IngestWorker
 from app.services.trading.execution_engine import ExecutionEngine
 from app.services.strategies.portfolio_manager import MultiStrategyPortfolioManager
+from app.services.trading.position_sync import PositionSyncService
+from app.services.strategies.autonomous_trader import AutonomousTrader
+from app import dependencies
 
 # Global references to background tasks
 market_data_queue: Optional[asyncio.Queue] = None
@@ -44,6 +48,8 @@ alpaca_client: Optional[AlpacaStreamingClient] = None
 ingest_worker: Optional[IngestWorker] = None
 execution_engine: Optional[ExecutionEngine] = None
 portfolio_manager: Optional[MultiStrategyPortfolioManager] = None
+position_sync_service: Optional[PositionSyncService] = None
+autonomous_trader: Optional[AutonomousTrader] = None
 background_tasks: list[asyncio.Task] = []
 
 # Initialize logging
@@ -52,7 +58,7 @@ logger = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global market_data_queue, binance_client, alpaca_client, ingest_worker, execution_engine, portfolio_manager, background_tasks, logger
+    global market_data_queue, binance_client, alpaca_client, ingest_worker, execution_engine, portfolio_manager, position_sync_service, autonomous_trader, background_tasks, logger
     
     # Setup logging first
     setup_logging(
@@ -94,11 +100,25 @@ async def lifespan(app: FastAPI):
     alpaca_client = AlpacaStreamingClient(market_data_queue)
     ingest_worker = IngestWorker(market_data_queue)
     
+    # Update dependencies for other modules
+    dependencies.market_data_queue = market_data_queue
+    dependencies.binance_client = binance_client
+    dependencies.alpaca_client = alpaca_client
+    dependencies.ingest_worker = ingest_worker
+    
     # Start background tasks
-    background_tasks = [
-        asyncio.create_task(binance_client.run()),
-        asyncio.create_task(ingest_worker.run()),
-    ]
+    background_tasks = []
+    
+    # Try to start Binance client (may be blocked in some regions)
+    try:
+        binance_task = asyncio.create_task(binance_client.run())
+        background_tasks.append(binance_task)
+        logger.info("Starting Binance WebSocket client")
+    except Exception as e:
+        logger.warning(f"Binance client failed to start (may be region blocked): {e}")
+    
+    # Always start the ingest worker
+    background_tasks.append(asyncio.create_task(ingest_worker.run()))
     
     # Only start Alpaca if credentials are configured
     if settings.ALPACA_API_KEY and settings.ALPACA_API_SECRET:
@@ -108,13 +128,27 @@ async def lifespan(app: FastAPI):
         execution_engine = ExecutionEngine()
         await execution_engine.initialize()
         background_tasks.append(asyncio.create_task(execution_engine.run()))
+        dependencies.execution_engine = execution_engine
         print("OMS execution engine started")
         
         # Initialize and start portfolio manager
         portfolio_manager = MultiStrategyPortfolioManager()
         await portfolio_manager.initialize()
+        dependencies.portfolio_manager = portfolio_manager
         # Portfolio manager runs on-demand, not as a background task
         logger.info("Portfolio manager initialized")
+        
+        # Initialize position sync service
+        position_sync_service = PositionSyncService(execution_engine.alpaca_client)
+        background_tasks.append(asyncio.create_task(position_sync_service.run()))
+        dependencies.position_sync_service = position_sync_service
+        logger.info("Position sync service started")
+        
+        # Initialize autonomous trader
+        autonomous_trader = AutonomousTrader(execution_engine)
+        dependencies.autonomous_trader = autonomous_trader
+        # Don't start automatically - let user control via API
+        logger.info("Autonomous trader initialized (not started)")
     else:
         logger.warning("Alpaca credentials not configured, skipping Alpaca client, OMS, and portfolio manager")
     
@@ -141,6 +175,10 @@ async def lifespan(app: FastAPI):
         await execution_engine.stop()
     if portfolio_manager:
         await portfolio_manager.stop()
+    if position_sync_service:
+        await position_sync_service.stop()
+    if autonomous_trader:
+        await autonomous_trader.stop()
         
     # Cancel background tasks
     for task in background_tasks:
@@ -252,6 +290,9 @@ def create_app() -> FastAPI:
     
     # Portfolio analytics
     app.include_router(portfolio_router)
+    
+    # Autonomous trading
+    app.include_router(autonomous_router, prefix="/api/v1/autonomous", tags=["autonomous"])
     
     # Real-time and admin
     app.include_router(websocket_router)

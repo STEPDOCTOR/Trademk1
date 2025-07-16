@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from app.db.questdb import execute_query
-from app.main import binance_client, ingest_worker
+from app import dependencies
 
 router = APIRouter()
 
@@ -36,7 +36,10 @@ class MarketTick(BaseModel):
 @router.get("/stream_status", response_model=StreamStatus)
 async def get_stream_status():
     """Get the status of market data streams."""
-    from app.main import alpaca_client, market_data_queue
+    binance_client = dependencies.binance_client
+    alpaca_client = dependencies.alpaca_client
+    ingest_worker = dependencies.ingest_worker
+    market_data_queue = dependencies.market_data_queue
     
     status_data = {
         "binance": {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Trademk1 - An autonomous real-time trading platform for U.S. stocks and top-15 cryptocurrencies, built with FastAPI, PostgreSQL, and Docker.
+Trademk1 - An autonomous real-time trading platform for U.S. stocks and cryptocurrencies, built with FastAPI, PostgreSQL, and Docker. Features automated trading strategies with stop loss, take profit, momentum trading, and portfolio rebalancing.
 
 ## Development Setup
 
@@ -52,6 +52,7 @@ This project uses Python 3.12.
 ```
 /app
 ├── api/              # API endpoints
+│   ├── autonomous.py # Autonomous trading control
 │   ├── health.py     # Health check endpoints with DB status
 │   ├── market_data.py # Market data query endpoints
 │   ├── auth.py       # Authentication (login, register, JWT)
@@ -101,14 +102,16 @@ This project uses Python 3.12.
 │   ├── trading/      # Order management system
 │   │   ├── alpaca_client.py  # Alpaca paper trading wrapper
 │   │   ├── execution_engine.py # Trade signal processor
-│   │   └── position_manager.py # Position & P&L tracker
+│   │   ├── position_manager.py # Position & P&L tracker
+│   │   └── position_sync.py  # Alpaca position synchronization
 │   ├── strategies/   # Trading strategy framework
 │   │   ├── base.py           # Abstract strategy base classes
 │   │   ├── sma_crossover.py  # SMA crossover strategy
 │   │   ├── momentum.py       # Momentum strategy
 │   │   ├── backtesting.py    # Backtesting engine
 │   │   ├── risk_manager.py   # Advanced risk management
-│   │   └── portfolio_manager.py # Multi-strategy management
+│   │   ├── portfolio_manager.py # Multi-strategy management
+│   │   └── autonomous_trader.py # Autonomous trading system
 │   ├── cache.py      # Redis caching service
 │   ├── portfolio_analytics.py # Portfolio performance analytics
 │   ├── notifications.py # User notification system
@@ -291,6 +294,14 @@ make strategies # List strategies
 - `GET /api/v1/trading/positions` - View current positions
 - `GET /api/v1/trading/portfolio` - Portfolio snapshot with P&L
 
+### Autonomous Trading
+- `GET /api/v1/autonomous/status` - Autonomous trading system status
+- `POST /api/v1/autonomous/start` - Start autonomous trading
+- `POST /api/v1/autonomous/stop` - Stop autonomous trading
+- `PATCH /api/v1/autonomous/strategy/{strategy_type}` - Update strategy configuration
+- `POST /api/v1/autonomous/force-cycle` - Force immediate trading cycle
+- `GET /api/v1/autonomous/position-summary` - Current position summary
+
 ### Strategies
 - `POST /api/v1/strategies/create` - Create new strategy
 - `GET /api/v1/strategies/list` - List user strategies
@@ -438,9 +449,67 @@ Configure in `.env` file (see `.env.example`):
   - ✅ Comprehensive Makefile
   - ✅ Development-optimized Docker Compose
 
+### Phase 5 - Autonomous Trading System (Complete)
+- ✅ **Position Synchronization**
+  - ✅ Automatic sync with Alpaca positions every 30 seconds
+  - ✅ Real-time P&L tracking and updates
+  - ✅ Support for both stocks and cryptocurrencies
+- ✅ **Autonomous Trading Strategies**
+  - ✅ Stop Loss Protection (5% default, configurable)
+  - ✅ Take Profit Strategy (15% default, configurable)
+  - ✅ Momentum Trading (3% threshold, configurable)
+  - ✅ Portfolio Rebalancing (10% deviation threshold)
+  - ✅ Mean Reversion Framework
+- ✅ **Smart Features**
+  - ✅ Market hours validation for stocks
+  - ✅ Partial position management
+  - ✅ Risk-based position sizing (2% per position)
+  - ✅ Maximum position limits (20 positions)
+  - ✅ Automatic error recovery and reconnection
+- ✅ **API Control**
+  - ✅ Start/stop autonomous trading
+  - ✅ Configure strategies independently
+  - ✅ Real-time status monitoring
+  - ✅ Force immediate trading cycles
+
+## Trading Symbols
+
+### Configured Stocks (20 symbols)
+- **Your Positions**: AMD, AMZN, GOOGL, HD, INTC, JNJ, META, NIO, NVDA, PYPL, SOFI, SPY, T, V
+- **Additional**: AAPL, MSFT, TSLA, JPM, AVGO (Broadcom), MU (Micron Technology)
+
+### Configured Cryptocurrencies (10 symbols)
+- BTCUSD, ETHUSD, SOLUSD, ADAUSD, XRPUSD, MATICUSD, LINKUSD, DOTUSD, UNIUSD, LTCUSD
+
+## Autonomous Trading System
+
+### Quick Start
+```bash
+# View autonomous trading status
+curl http://localhost:8000/api/v1/autonomous/status
+
+# Start autonomous trading (requires authentication)
+curl -X POST http://localhost:8000/api/v1/autonomous/start \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Configure stop loss to 10%
+curl -X PATCH http://localhost:8000/api/v1/autonomous/strategy/stop_loss \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"stop_loss_pct": 0.10}'
+```
+
+### Autonomous Trading Features
+1. **Position Monitoring**: Continuously monitors all positions for trading signals
+2. **Stop Loss**: Automatically sells positions down by configured percentage
+3. **Take Profit**: Takes profits on positions up by configured percentage
+4. **Momentum Trading**: Identifies and trades on significant price movements
+5. **Portfolio Rebalancing**: Maintains target allocations across positions
+6. **Risk Management**: Position sizing, maximum positions, market hours validation
+
 ## TODO/Roadmap
 
-### Phase 5 - Advanced Features (Next)
+### Phase 6 - Advanced Features (Next)
 - [ ] Machine learning price prediction models
 - [ ] Sentiment analysis from news/social media
 - [ ] Advanced order types (stop-loss, trailing stop)
@@ -448,7 +517,7 @@ Configure in `.env` file (see `.env.example`):
 - [ ] Custom technical indicators framework
 - [ ] Strategy marketplace
 
-### Phase 6 - Enterprise Features
+### Phase 7 - Enterprise Features
 - [ ] Multi-tenant support
 - [ ] Advanced compliance reporting
 - [ ] Integration with traditional brokers

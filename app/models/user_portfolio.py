@@ -1,12 +1,12 @@
 """User portfolio tracking models."""
-from sqlalchemy import Column, String, Float, ForeignKey, DateTime, JSON
+from sqlalchemy import Column, String, Float, ForeignKey, DateTime, JSON, Boolean
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import Base
 
 
-class UserPortfolio(BaseModel):
+class UserPortfolio(Base):
     """User portfolio summary and statistics."""
     
     __tablename__ = "user_portfolios"
@@ -46,7 +46,7 @@ class UserPortfolio(BaseModel):
     user = relationship("User", back_populates="portfolio")
 
 
-class UserPreferences(BaseModel):
+class UserPreferences(Base):
     """User preferences and settings."""
     
     __tablename__ = "user_preferences"

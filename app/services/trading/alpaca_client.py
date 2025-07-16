@@ -11,6 +11,7 @@ from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce, OrderType
 from alpaca.data.live import StockDataStream
+from alpaca.trading.stream import TradingStream
 
 from app.config.settings import get_settings
 from app.models.order import OrderStatus
@@ -35,7 +36,7 @@ class AlpacaClient:
         )
         
         # WebSocket stream for order updates
-        self.stream_client: Optional[StockDataStream] = None
+        self.stream_client: Optional[TradingStream] = None
         self.order_update_handler: Optional[Callable] = None
         
         # WebSocket connection state
@@ -45,19 +46,21 @@ class AlpacaClient:
     async def initialize_stream(self, order_update_handler: Callable):
         """Initialize WebSocket stream for order updates."""
         self.order_update_handler = order_update_handler
-        self.stream_client = StockDataStream(
+        self.stream_client = TradingStream(
             api_key=self.api_key,
             secret_key=self.secret_key,
+            paper=True,
             raw_data=True
         )
         
-        # Subscribe to trade updates
+        # Define handler for trade updates
         async def handle_trade_update(data):
             try:
                 await self.order_update_handler(data)
             except Exception as e:
                 logger.error(f"Error handling trade update: {e}")
         
+        # Subscribe to trade updates
         self.stream_client.subscribe_trade_updates(handle_trade_update)
         
     async def connect_stream(self):
@@ -69,7 +72,8 @@ class AlpacaClient:
             try:
                 logger.info("Connecting to Alpaca WebSocket stream...")
                 self._ws_connected = True
-                await self.stream_client.run()
+                # Use _run_forever() instead of run() to work with existing event loop
+                await self.stream_client._run_forever()
             except Exception as e:
                 logger.error(f"Alpaca WebSocket disconnected: {e}")
                 self._ws_connected = False
@@ -87,6 +91,12 @@ class AlpacaClient:
     ) -> Dict[str, Any]:
         """Submit an order to Alpaca."""
         try:
+            # Convert symbol format if needed (BTCUSDT -> BTC/USD)
+            if symbol.endswith("USDT"):
+                alpaca_symbol = symbol[:-4] + "/USD"
+            else:
+                alpaca_symbol = symbol
+                
             # Convert parameters
             alpaca_side = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
             alpaca_tif = TimeInForce.DAY if time_in_force.lower() == "day" else TimeInForce.GTC
@@ -94,7 +104,7 @@ class AlpacaClient:
             # Create order request based on type
             if order_type.lower() == "market":
                 order_request = MarketOrderRequest(
-                    symbol=symbol,
+                    symbol=alpaca_symbol,
                     qty=qty,
                     side=alpaca_side,
                     time_in_force=alpaca_tif
@@ -103,7 +113,7 @@ class AlpacaClient:
                 if not limit_price:
                     raise ValueError("Limit price required for limit orders")
                 order_request = LimitOrderRequest(
-                    symbol=symbol,
+                    symbol=alpaca_symbol,
                     qty=qty,
                     side=alpaca_side,
                     time_in_force=alpaca_tif,

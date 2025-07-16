@@ -74,6 +74,12 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class PasswordResetRequest(BaseModel):
+    """Password reset request."""
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+
 # Audit logger
 audit_logger = AuditLogger()
 
@@ -426,13 +432,12 @@ async def request_password_reset(
 
 @router.post("/reset-password", response_model=MessageResponse)
 async def reset_password(
-    token: str,
-    new_password: str = Field(..., min_length=8, max_length=100),
     request: Request,
+    reset_data: PasswordResetRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """Reset password using reset token."""
-    email = verify_password_reset_token(token)
+    email = verify_password_reset_token(reset_data.token)
     if not email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -451,7 +456,7 @@ async def reset_password(
             detail="User not found"
         )
     
-    user.password_hash = get_password_hash(new_password)
+    user.password_hash = get_password_hash(reset_data.new_password)
     await db.commit()
     
     await audit_logger.log_event(

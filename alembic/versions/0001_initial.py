@@ -1,6 +1,6 @@
 """initial
 
-Revision ID: ed0b60f36808
+Revision ID: 0001_initial
 Revises: 
 Create Date: 2025-07-14 22:06:10.048676
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '0001'
+revision: str = '0001_initial'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

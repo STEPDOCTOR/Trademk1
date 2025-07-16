@@ -55,6 +55,11 @@ docker-compose.override.yml
 # Claude
 .claude/
 
+# Node modules
+node_modules/
+package.json
+package-lock.json
+
 # Temporary files
 tmp/
 temp/

@@ -1,0 +1,25 @@
+🎯 TRADEMK1 DEMO ACCESS
+======================
+
+📧 Email: demo@trademk1.local
+🔑 Password: DemoUser123!
+🎫 Token: 
+
+🌐 Web Interfaces:
+- API Docs: http://localhost:8000/api/docs/
+- Health Check: http://localhost:8000/api/health/detailed
+- QuestDB Console: http://localhost:9000
+
+📝 Quick Commands:
+# Check Bitcoin price
+curl http://localhost:8000/api/v1/market-data/latest/BTCUSDT | jq
+
+# View all symbols
+curl http://localhost:8000/api/v1/market-data/symbols | jq
+
+# Check your portfolio (requires token)
+curl -H "Authorization: Bearer " http://localhost:8000/api/v1/portfolio/summary | jq
+
+🛑 Stop Demo:
+docker compose down
+

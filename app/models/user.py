@@ -3,10 +3,10 @@
 from sqlalchemy import Boolean, Column, String, DateTime
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import Base
 
 
-class User(BaseModel):
+class User(Base):
     """User model for storing user accounts."""
     
     __tablename__ = "users"

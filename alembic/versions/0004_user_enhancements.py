@@ -140,28 +140,28 @@ def upgrade() -> None:
         CREATE TRIGGER update_api_keys_updated_at
         BEFORE UPDATE ON api_keys
         FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
+        EXECUTE FUNCTION update_updated_at();
     """)
     
     op.execute("""
         CREATE TRIGGER update_user_portfolios_updated_at
         BEFORE UPDATE ON user_portfolios
         FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
+        EXECUTE FUNCTION update_updated_at();
     """)
     
     op.execute("""
         CREATE TRIGGER update_user_preferences_updated_at
         BEFORE UPDATE ON user_preferences
         FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
+        EXECUTE FUNCTION update_updated_at();
     """)
     
     op.execute("""
         CREATE TRIGGER update_audit_logs_updated_at
         BEFORE UPDATE ON audit_logs
         FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
+        EXECUTE FUNCTION update_updated_at();
     """)
 
 

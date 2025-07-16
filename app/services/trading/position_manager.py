@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 
 from app.db.postgres import get_db_session
-from app.db.questdb import get_questdb_connection
+from app.db.optimized_postgres import optimized_db
+from app.db.questdb import get_questdb_pool
 from app.models.position import Position
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,7 @@ class PositionManager:
                 
     async def _update_all_positions(self):
         """Update all positions with latest prices from QuestDB."""
-        async with get_db_session() as db:
+        async with optimized_db.get_session() as db:
             # Get all open positions
             result = await db.execute(
                 select(Position).where(Position.qty != 0)
@@ -179,7 +180,7 @@ class PositionManager:
         
     async def get_portfolio_snapshot(self) -> Dict[str, Any]:
         """Get current portfolio snapshot."""
-        async with get_db_session() as db:
+        async with optimized_db.get_session() as db:
             result = await db.execute(select(Position))
             positions = result.scalars().all()
             

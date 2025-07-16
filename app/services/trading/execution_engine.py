@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import get_settings
 from app.db.postgres import get_db_session
+from app.db.optimized_postgres import optimized_db
 from app.models.order import Order, OrderSide, OrderType, OrderStatus
 from app.models.config import Config
 from app.services.trading.alpaca_client import AlpacaClient
@@ -104,7 +105,7 @@ class ExecutionEngine:
         qty = float(signal["qty"])
         reason = signal.get("reason", "Manual signal")
         
-        async with get_db_session() as db:
+        async with optimized_db.get_session() as db:
             # Validate market hours for stocks
             if not symbol.endswith("USDT") and not self._is_market_open():
                 logger.warning(f"Market closed for stock {symbol}")
@@ -125,10 +126,12 @@ class ExecutionEngine:
                 return
                 
             # Create order record
+            order_side = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
+            logger.info(f"Creating order with side: {order_side}, value: {order_side.value}")
             order = Order(
                 id=uuid4(),
                 symbol=symbol,
-                side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
+                side=order_side,
                 qty=qty,
                 type=OrderType.MARKET,
                 status=OrderStatus.PENDING,
@@ -139,11 +142,14 @@ class ExecutionEngine:
             
             try:
                 # Submit to Alpaca
+                # Crypto orders need GTC time_in_force
+                time_in_force = "gtc" if symbol.endswith("USDT") else "day"
                 alpaca_result = await self.alpaca_client.submit_order(
                     symbol=symbol,
                     side=side,
                     qty=qty,
-                    order_type="market"
+                    order_type="market",
+                    time_in_force=time_in_force
                 )
                 
                 # Update order with Alpaca info
@@ -169,7 +175,7 @@ class ExecutionEngine:
             if not alpaca_id:
                 return
                 
-            async with get_db_session() as db:
+            async with optimized_db.get_session() as db:
                 # Find order
                 result = await db.execute(
                     select(Order).where(Order.alpaca_id == alpaca_id)
@@ -282,7 +288,7 @@ class ExecutionEngine:
         order = Order(
             id=uuid4(),
             symbol=symbol,
-            side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
+            side=OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL,
             qty=qty,
             type=OrderType.MARKET,
             status=OrderStatus.REJECTED,

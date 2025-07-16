@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user, AuthUser, require_superuser
+from app.auth.dependencies import get_current_user, AuthUser, get_current_superuser
 from app.db.postgres import get_db, optimized_db, query_analyzer
 from app.db.query_analyzer import IndexAdvisor
 from app.services.cache import cache_service
@@ -95,7 +95,7 @@ class IPManagementRequest(BaseModel):
 
 @router.get("/health", response_model=SystemHealth)
 async def get_system_health(
-    current_user: AuthUser = Depends(require_superuser),
+    current_user: AuthUser = Depends(get_current_superuser),
     db: AsyncSession = Depends(get_db)
 ):
     """Get comprehensive system health status."""
@@ -150,7 +150,7 @@ async def get_system_health(
 
 @router.get("/database/stats", response_model=DatabaseStats)
 async def get_database_stats(
-    current_user: AuthUser = Depends(require_superuser),
+    current_user: AuthUser = Depends(get_current_superuser),
     db: AsyncSession = Depends(get_db)
 ):
     """Get detailed database statistics."""
@@ -219,7 +219,7 @@ async def get_database_stats(
 @router.get("/database/slow-queries", response_model=List[QueryPerformanceStats])
 async def get_slow_queries(
     limit: int = 10,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Get slow queries from performance analyzer."""
     slow_queries = query_analyzer.get_slow_queries(limit=limit)
@@ -242,7 +242,7 @@ async def get_slow_queries(
 @router.get("/database/frequent-queries", response_model=List[QueryPerformanceStats])
 async def get_frequent_queries(
     limit: int = 10,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Get frequently executed queries."""
     frequent_queries = query_analyzer.get_frequent_queries(limit=limit)
@@ -265,7 +265,7 @@ async def get_frequent_queries(
 @router.get("/database/index-suggestions", response_model=List[IndexSuggestion])
 async def get_index_suggestions(
     min_occurrences: int = 5,
-    current_user: AuthUser = Depends(require_superuser),
+    current_user: AuthUser = Depends(get_current_superuser),
     db: AsyncSession = Depends(get_db)
 ):
     """Get suggestions for missing indexes."""
@@ -289,7 +289,7 @@ async def get_index_suggestions(
 async def get_table_info(
     table_name: str,
     schema: str = "public",
-    current_user: AuthUser = Depends(require_superuser),
+    current_user: AuthUser = Depends(get_current_superuser),
     db: AsyncSession = Depends(get_db)
 ):
     """Get detailed information about a table."""
@@ -301,7 +301,7 @@ async def get_table_info(
 @router.post("/cache/clear")
 async def clear_cache(
     pattern: Optional[str] = None,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Clear cache entries."""
     try:
@@ -324,7 +324,7 @@ async def clear_cache(
 
 @router.get("/connection-pool/stats", response_model=ConnectionPoolStats)
 async def get_connection_pool_stats(
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Get connection pool statistics."""
     stats = await optimized_db.get_connection_stats()
@@ -333,7 +333,7 @@ async def get_connection_pool_stats(
 
 @router.post("/query-analyzer/reset")
 async def reset_query_analyzer(
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Reset query analyzer statistics."""
     query_analyzer.query_stats.clear()
@@ -343,7 +343,7 @@ async def reset_query_analyzer(
 @router.get("/database/explain/{table_name}")
 async def explain_table_queries(
     table_name: str,
-    current_user: AuthUser = Depends(require_superuser),
+    current_user: AuthUser = Depends(get_current_superuser),
     db: AsyncSession = Depends(get_db)
 ):
     """Show EXPLAIN ANALYZE for common queries on a table."""
@@ -380,7 +380,7 @@ security_manager = SecurityManager(SecurityConfig())
 
 @router.get("/security/stats", response_model=SecurityStats)
 async def get_security_stats(
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Get security statistics."""
     stats = await security_manager.get_security_stats()
@@ -390,7 +390,7 @@ async def get_security_stats(
 @router.post("/security/block-ip")
 async def block_ip(
     request_data: IPManagementRequest,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Block an IP address."""
     await security_manager.block_ip(
@@ -409,7 +409,7 @@ async def block_ip(
 @router.post("/security/unblock-ip")
 async def unblock_ip(
     ip: str,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Unblock an IP address."""
     await security_manager.unblock_ip(ip)
@@ -419,7 +419,7 @@ async def unblock_ip(
 @router.post("/security/allow-ip")
 async def allow_ip(
     ip: str,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Add IP to allow list."""
     security_manager.allow_ip(ip)
@@ -429,7 +429,7 @@ async def allow_ip(
 @router.delete("/security/allow-ip/{ip}")
 async def remove_allowed_ip(
     ip: str,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Remove IP from allow list."""
     security_manager.remove_allowed_ip(ip)
@@ -438,7 +438,7 @@ async def remove_allowed_ip(
 
 @router.get("/rate-limits/stats")
 async def get_rate_limit_stats(
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Get rate limiting statistics."""
     try:
@@ -478,7 +478,7 @@ async def get_rate_limit_stats(
 @router.post("/rate-limits/clear")
 async def clear_rate_limits(
     pattern: Optional[str] = None,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Clear rate limit entries."""
     try:
@@ -505,7 +505,7 @@ async def clear_rate_limits(
 # Monitoring and metrics endpoints
 @router.get("/metrics/detailed")
 async def get_detailed_metrics(
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Get detailed application metrics."""
     return await get_detailed_health_metrics()
@@ -513,7 +513,7 @@ async def get_detailed_metrics(
 
 @router.get("/metrics/summary")
 async def get_metrics_summary(
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Get metrics summary."""
     all_metrics = metrics_collector.get_all_metrics()
@@ -544,7 +544,7 @@ async def get_metrics_summary(
 @router.get("/metrics/{metric_name}")
 async def get_metric_details(
     metric_name: str,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Get details for a specific metric."""
     summary = metrics_collector.get_metric_summary(metric_name)
@@ -578,7 +578,7 @@ async def get_metric_details(
 @router.post("/metrics/reset")
 async def reset_metrics(
     metric_name: Optional[str] = None,
-    current_user: AuthUser = Depends(require_superuser)
+    current_user: AuthUser = Depends(get_current_superuser)
 ):
     """Reset metrics (all or specific metric)."""
     if metric_name:

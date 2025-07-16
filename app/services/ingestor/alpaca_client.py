@@ -10,7 +10,7 @@ import websockets
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from app.config.settings import settings
-from app.services.ingestor.models import Exchange, Tick, TickType, US_STOCKS
+from app.services.ingestor.models import Exchange, Tick, TickType, TOP_15_CRYPTOS
 
 logger = logging.getLogger(__name__)
 
@@ -27,15 +27,22 @@ class AlpacaStreamingClient:
         self.queue = queue
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self.running = False
-        self.symbols = set(US_STOCKS)
+        # Convert crypto symbols to Alpaca format (e.g., BTCUSDT -> BTC/USD)
+        self.symbols = set()
+        for symbol in TOP_15_CRYPTOS:
+            # Remove 'USDT' suffix and add '/USD'
+            if symbol.endswith('USDT'):
+                base = symbol[:-4]
+                self.symbols.add(f"{base}/USD")
         self.reconnect_delay = 1.0
         self.max_reconnect_delay = 60.0
         self.authenticated = False
+        logger.info(f"Alpaca client initialized with {len(self.symbols)} crypto symbols: {list(self.symbols)[:5]}...")
         
     async def connect(self) -> None:
         """Connect to Alpaca WebSocket."""
-        # Use paper trading WebSocket URL
-        url = "wss://stream.data.alpaca.markets/v2/iex"
+        # Use crypto data stream URL (v1beta3 for crypto)
+        url = "wss://stream.data.alpaca.markets/v1beta3/crypto/us"
         
         logger.info(f"Connecting to Alpaca WebSocket: {url}")
         self.websocket = await websockets.connect(url)
@@ -62,14 +69,26 @@ class AlpacaStreamingClient:
         await self.websocket.send(json.dumps(auth_message))
         
         # Wait for authentication response
-        response = await self.websocket.recv()
-        data = json.loads(response)
-        
-        if data[0]["msg"] == "authenticated":
-            self.authenticated = True
-            logger.info("Authenticated with Alpaca")
-        else:
-            raise ConnectionError(f"Alpaca authentication failed: {data}")
+        # First we get 'connected', then we send auth, then we get 'authenticated'
+        while True:
+            response = await self.websocket.recv()
+            data = json.loads(response)
+            
+            # Check for authentication success
+            if isinstance(data, list) and len(data) > 0:
+                msg = data[0]
+                if msg.get("T") == "success":
+                    if msg.get("msg") == "connected":
+                        logger.debug("Connected to Alpaca, sending auth...")
+                        # Continue to wait for authenticated message
+                    elif msg.get("msg") == "authenticated":
+                        self.authenticated = True
+                        logger.info("Authenticated with Alpaca crypto stream")
+                        break
+                elif msg.get("T") == "error":
+                    raise ConnectionError(f"Alpaca authentication failed: {data}")
+            else:
+                logger.warning(f"Unexpected auth response format: {data}")
             
     async def subscribe(self) -> None:
         """Subscribe to market data streams."""
@@ -107,27 +126,31 @@ class AlpacaStreamingClient:
                 msg_type = message.get("T")
                 
                 if msg_type == "q":  # Quote
+                    # Convert symbol back to our format (BTC/USD -> BTCUSDT)
+                    symbol = message["S"].replace("/USD", "USDT")
                     tick = Tick(
-                        symbol=message["S"],
+                        symbol=symbol,
                         exchange=Exchange.ALPACA,
                         tick_type=TickType.QUOTE,
-                        timestamp=datetime.fromisoformat(message["t"].replace("Z", "+00:00")),
-                        price=(message["bp"] + message["ap"]) / 2,  # Mid price
-                        bid_price=message["bp"],
-                        ask_price=message["ap"],
-                        bid_size=message["bs"],
-                        ask_size=message["as"],
+                        timestamp=datetime.fromisoformat(message["t"].replace("Z", "+00:00")).replace(tzinfo=None),
+                        price=(float(message["bp"]) + float(message["ap"])) / 2,  # Mid price
+                        bid_price=float(message["bp"]),
+                        ask_price=float(message["ap"]),
+                        bid_size=float(message["bs"]),
+                        ask_size=float(message["as"]),
                     )
                     ticks.append(tick)
                     
                 elif msg_type == "b":  # Bar (minute)
+                    # Convert symbol back to our format (BTC/USD -> BTCUSDT)
+                    symbol = message["S"].replace("/USD", "USDT")
                     tick = Tick(
-                        symbol=message["S"],
+                        symbol=symbol,
                         exchange=Exchange.ALPACA,
                         tick_type=TickType.BAR,
-                        timestamp=datetime.fromisoformat(message["t"].replace("Z", "+00:00")),
-                        price=message["c"],  # Close price
-                        volume=message["v"],
+                        timestamp=datetime.fromisoformat(message["t"].replace("Z", "+00:00")).replace(tzinfo=None),
+                        price=float(message["c"]),  # Close price
+                        volume=float(message["v"]),
                     )
                     ticks.append(tick)
                     

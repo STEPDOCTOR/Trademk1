@@ -2,10 +2,10 @@
 from sqlalchemy import Column, String, JSON, DateTime, Text, Index
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
-from app.models.base import BaseModel
+from app.models.base import Base
 
 
-class AuditLog(BaseModel):
+class AuditLog(Base):
     """Audit log for tracking user actions and system events."""
     
     __tablename__ = "audit_logs"
@@ -35,7 +35,7 @@ class AuditLog(BaseModel):
     response_status = Column(String(3), nullable=True)
     
     # Additional metadata
-    metadata = Column(JSON, nullable=False, default={})
+    audit_metadata = Column(JSON, nullable=False, default={})
     
     # Search optimization
     __table_args__ = (

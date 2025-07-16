@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional, Dict, Any
 from datetime import datetime, timedelta
+from uuid import uuid4
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine, AsyncEngine
@@ -73,7 +74,8 @@ class OptimizedDatabase:
                 },
                 "command_timeout": 60,
                 "prepared_statement_cache_size": 0,  # Disable to avoid cache bloat
-                "prepared_statement_name_func": lambda: f"stmt_{asyncio.current_task().get_name()}",
+                # Generate unique statement names to avoid conflicts
+                "prepared_statement_name_func": lambda: f"stmt_{uuid4().hex[:8]}",
             },
             # Query execution options
             execution_options={

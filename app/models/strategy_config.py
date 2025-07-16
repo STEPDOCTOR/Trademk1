@@ -2,10 +2,10 @@
 from sqlalchemy import Column, String, JSON, Boolean, Float
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
-from app.models.base import BaseModel
+from app.models.base import Base
 
 
-class StrategyConfiguration(BaseModel):
+class StrategyConfiguration(Base):
     """Strategy configuration stored in database."""
     
     __tablename__ = "strategy_configs"

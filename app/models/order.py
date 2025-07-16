@@ -6,7 +6,7 @@ from sqlalchemy import Column, String, Float, Integer, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 import enum
 
-from app.models.base import BaseModel
+from app.models.base import Base
 
 
 class OrderSide(str, enum.Enum):
@@ -34,16 +34,16 @@ class OrderStatus(str, enum.Enum):
     EXPIRED = "expired"
 
 
-class Order(BaseModel):
+class Order(Base):
     """Order model for tracking all trading orders."""
     
     __tablename__ = "orders"
     
     symbol = Column(String(20), nullable=False, index=True)
-    side = Column(SQLEnum(OrderSide), nullable=False)
+    side = Column(SQLEnum(OrderSide, name="orderside", values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     qty = Column(Float, nullable=False)
-    type = Column(SQLEnum(OrderType), nullable=False, default=OrderType.MARKET)
-    status = Column(SQLEnum(OrderStatus), nullable=False, default=OrderStatus.PENDING, index=True)
+    type = Column(SQLEnum(OrderType, name="ordertype", values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=OrderType.MARKET)
+    status = Column(SQLEnum(OrderStatus, name="orderstatus", values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=OrderStatus.PENDING, index=True)
     
     # Price fields
     price = Column(Float, nullable=True)  # Limit price

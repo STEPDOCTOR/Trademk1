@@ -1,7 +1,7 @@
 """Performance metrics and reporting for trading strategies."""
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import pandas as pd
 import numpy as np
 from enum import Enum

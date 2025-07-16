@@ -43,7 +43,7 @@ def upgrade() -> None:
         CREATE TRIGGER update_strategy_configs_updated_at
         BEFORE UPDATE ON strategy_configs
         FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
+        EXECUTE FUNCTION update_updated_at();
     """)
     
     # Add default strategy configurations

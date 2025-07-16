@@ -65,7 +65,7 @@ def upgrade() -> None:
         CREATE TRIGGER update_orders_updated_at
         BEFORE UPDATE ON orders
         FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
+        EXECUTE FUNCTION update_updated_at();
     """)
     
     # Create trigger for positions table
@@ -73,7 +73,7 @@ def upgrade() -> None:
         CREATE TRIGGER update_positions_updated_at
         BEFORE UPDATE ON positions
         FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
+        EXECUTE FUNCTION update_updated_at();
     """)
     
     # Add risk management configs

@@ -3,10 +3,10 @@ from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import BaseModel
+from app.models.base import Base
 
 
-class APIKey(BaseModel):
+class APIKey(Base):
     """API Key for programmatic access."""
     
     __tablename__ = "api_keys"
