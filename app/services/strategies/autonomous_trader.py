@@ -19,6 +19,7 @@ from app.services.performance_tracker import performance_tracker
 from app.services.notification_service import notification_service, NotificationType
 from app.services.technical_indicators import technical_indicators
 from app.services.position_sizing import position_sizing
+from app.services.market_sentiment import market_sentiment_service, MarketSentiment
 
 logger = logging.getLogger(__name__)
 
@@ -261,11 +262,21 @@ class AutonomousTrader:
                     continue
                 
                 # Use position sizing for momentum trades too
+                # Adjust confidence based on market sentiment
+                base_confidence = min(momentum / 0.05, 1.0)
+                if hasattr(self, '_market_analysis') and self._market_analysis:
+                    if self._market_analysis.overall_sentiment == MarketSentiment.VERY_BULLISH:
+                        base_confidence *= 1.2
+                    elif self._market_analysis.overall_sentiment == MarketSentiment.BEARISH:
+                        base_confidence *= 0.8
+                    elif self._market_analysis.overall_sentiment == MarketSentiment.VERY_BEARISH:
+                        base_confidence *= 0.6
+                
                 size_recommendation = await position_sizing.calculate_position_size(
                     symbol=symbol,
                     account_value=portfolio_value,
                     current_price=price,
-                    signal_confidence=min(momentum / 0.05, 1.0),  # Convert momentum to confidence
+                    signal_confidence=min(base_confidence, 1.0),
                     existing_positions=num_positions,
                     max_positions=max_positions,
                     risk_per_trade=0.01
@@ -466,6 +477,16 @@ class AutonomousTrader:
     async def run_cycle(self):
         """Run one cycle of autonomous trading."""
         try:
+            # Check market sentiment first
+            should_trade, reason = await market_sentiment_service.should_trade_aggressively()
+            if not should_trade:
+                logger.warning(f"Skipping cycle - unfavorable market conditions: {reason}")
+                return
+            
+            # Get market analysis for position sizing adjustments
+            market_analysis = await market_sentiment_service.get_market_analysis()
+            self._market_analysis = market_analysis  # Store for use in position sizing
+            
             # First check daily limits if enabled
             if self.strategies[StrategyType.DAILY_LIMITS].enabled:
                 metrics = await performance_tracker.get_realtime_metrics()

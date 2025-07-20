@@ -34,6 +34,7 @@ from app.api.notifications import router as notifications_router
 from app.api.technical_analysis import router as technical_router
 from app.api.position_sizing import router as position_sizing_router
 from app.api.backtesting import router as backtesting_router
+from app.api.market_sentiment import router as market_sentiment_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
@@ -205,9 +206,10 @@ async def lifespan(app: FastAPI):
         logger.info("Autonomous trader settings:")
         logger.info("  • Momentum: 0.1% threshold (ultra-sensitive)")
         logger.info("  • Technical Analysis: RSI, MACD, Volume (50% confidence)")
-        logger.info("  • Position Sizing: Volatility-adjusted with risk management")
+        logger.info("  • Market Sentiment: Fear & Greed Index monitoring")
+        logger.info("  • Position Sizing: Volatility & sentiment adjusted")
         logger.info("  • Check interval: 15 seconds")
-        logger.info("  • Position size: Dynamic (0.5-5% based on risk)")
+        logger.info("  • Position size: Dynamic (0.5-5% based on risk & sentiment)")
         logger.info("  • Stop loss: 2%")
         logger.info("  • Take profit: 5% (with scaled exits)")
         
@@ -374,6 +376,9 @@ def create_app() -> FastAPI:
     
     # Backtesting
     app.include_router(backtesting_router)
+    
+    # Market Sentiment
+    app.include_router(market_sentiment_router)
     
     # Real-time and admin
     app.include_router(websocket_router)

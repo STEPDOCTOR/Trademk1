@@ -671,23 +671,23 @@ The system currently has temporary modifications for aggressive autonomous tradi
 **Last Updated**: 2025-07-20
 
 ### Code Metrics
-- **Total Files**: 141
-- **Total Lines of Code**: 25,207
+- **Total Files**: 143
+- **Total Lines of Code**: 26,032
 
 ### Breakdown by Language
-- **Python (.py)**: 22,349 lines (88.7%)
-- **JavaScript (.js)**: 371 lines (1.5%)
-- **HTML (.html)**: 1,108 lines (4.4%)
-- **Shell Scripts (.sh)**: 1,106 lines (4.4%)
-- **YAML (.yaml/.yml)**: 217 lines (0.9%)
+- **Python (.py)**: 23,192 lines (89.1%)
+- **JavaScript (.js)**: 371 lines (1.4%)
+- **HTML (.html)**: 1,108 lines (4.3%)
+- **Shell Scripts (.sh)**: 1,106 lines (4.2%)
+- **YAML (.yaml/.yml)**: 217 lines (0.8%)
 - **SQL (.sql)**: 38 lines (0.1%)
 - **Dockerfiles**: 18 lines (0.1%)
 
 ### Key Components
-- **API Endpoints**: 22 routers (added backtesting)
+- **API Endpoints**: 23 routers (added market sentiment)
 - **Database Models**: 13 models
-- **Services**: 19+ business logic services
-- **Trading Strategies**: 8 autonomous strategies (added technical analysis)
+- **Services**: 20+ business logic services
+- **Trading Strategies**: 8 autonomous strategies (with sentiment analysis)
 - **Middleware**: 4 middleware components
 - **Background Tasks**: 5 async workers
 
@@ -701,3 +701,4 @@ The system currently has temporary modifications for aggressive autonomous tradi
 - Position sizing service (341 lines)
 - Backtesting engine (655 lines)
 - Backtest viewer UI (461 lines)
+- Market sentiment analysis (840 lines)
