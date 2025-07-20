@@ -33,6 +33,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.notifications import router as notifications_router
 from app.api.technical_analysis import router as technical_router
 from app.api.position_sizing import router as position_sizing_router
+from app.api.backtesting import router as backtesting_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
@@ -370,6 +371,9 @@ def create_app() -> FastAPI:
     
     # Position Sizing
     app.include_router(position_sizing_router)
+    
+    # Backtesting
+    app.include_router(backtesting_router)
     
     # Real-time and admin
     app.include_router(websocket_router)

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backtest Results Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .positive { color: #10b981; }
+        .negative { color: #ef4444; }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .trades-table {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background: #5a67d8;
+        }
+        .preset-btn {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .preset-btn:hover {
+            background: #d1d5db;
+        }
+        .preset-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 5px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        @media (max-width: 768px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Backtest Results Viewer</h1>
+            <p>Test your aggressive trading strategies on historical data</p>
+        </div>
+
+        <div class="controls">
+            <h3>Run New Backtest</h3>
+            <div style="margin-bottom: 15px;">
+                <button class="btn preset-btn" onclick="selectPreset('ultra_aggressive')">Ultra Aggressive</button>
+                <button class="btn preset-btn" onclick="selectPreset('aggressive')">Aggressive</button>
+                <button class="btn preset-btn" onclick="selectPreset('balanced')">Balanced</button>
+                <button class="btn preset-btn" onclick="selectPreset('conservative')">Conservative</button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div class="form-group">
+                    <label>Lookback Days</label>
+                    <input type="number" id="lookbackDays" value="30" min="7" max="365">
+                </div>
+                <div class="form-group">
+                    <label>Initial Capital</label>
+                    <input type="number" id="initialCapital" value="100000" min="10000">
+                </div>
+                <div class="form-group">
+                    <label>Symbols (comma-separated, leave empty for all)</label>
+                    <input type="text" id="symbols" placeholder="AAPL,MSFT,GOOGL">
+                </div>
+            </div>
+            
+            <button class="btn" onclick="runBacktest()">Run Backtest</button>
+            <button class="btn" onclick="compareStrategies()">Compare All Strategies</button>
+        </div>
+
+        <div id="resultsContainer" style="display: none;">
+            <div class="metrics-grid" id="metricsGrid"></div>
+            
+            <div class="chart-container">
+                <h3>Equity Curve</h3>
+                <canvas id="equityChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Daily Returns Distribution</h3>
+                <canvas id="returnsChart"></canvas>
+            </div>
+            
+            <div class="trades-table" id="tradesContainer" style="display: none;">
+                <h3 style="padding: 20px 20px 0;">Recent Trades</h3>
+                <div style="overflow-x: auto;">
+                    <table id="tradesTable">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>P&L</th>
+                                <th>P&L %</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="comparisonContainer" style="display: none;">
+            <div class="chart-container">
+                <h3>Strategy Comparison</h3>
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        </div>
+
+        <div id="loadingContainer" class="loading" style="display: none;">
+            <p>Running backtest... This may take a few moments.</p>
+        </div>
+    </div>
+
+    <script>
+        let currentPreset = 'aggressive';
+        let equityChart = null;
+        let returnsChart = null;
+        let comparisonChart = null;
+
+        const presets = {
+            ultra_aggressive: {
+                momentum_threshold: 0.001,
+                min_confidence: 0.4,
+                stop_loss_pct: 0.015,
+                take_profit_pct: 0.03,
+                position_size_pct: 0.03,
+                max_positions: 25
+            },
+            aggressive: {
+                momentum_threshold: 0.003,
+                min_confidence: 0.5,
+                stop_loss_pct: 0.02,
+                take_profit_pct: 0.05,
+                position_size_pct: 0.025,
+                max_positions: 20
+            },
+            balanced: {
+                momentum_threshold: 0.005,
+                min_confidence: 0.6,
+                stop_loss_pct: 0.03,
+                take_profit_pct: 0.08,
+                position_size_pct: 0.02,
+                max_positions: 15
+            },
+            conservative: {
+                momentum_threshold: 0.01,
+                min_confidence: 0.7,
+                stop_loss_pct: 0.05,
+                take_profit_pct: 0.15,
+                position_size_pct: 0.015,
+                max_positions: 10
+            }
+        };
+
+        function selectPreset(preset) {
+            currentPreset = preset;
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        async function runBacktest() {
+            const lookbackDays = parseInt(document.getElementById('lookbackDays').value);
+            const initialCapital = parseFloat(document.getElementById('initialCapital').value);
+            const symbolsInput = document.getElementById('symbols').value;
+            const symbols = symbolsInput ? symbolsInput.split(',').map(s => s.trim()) : null;
+
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - lookbackDays);
+
+            const params = {
+                ...presets[currentPreset],
+                symbols: symbols,
+                start_date: startDate.toISOString(),
+                end_date: endDate.toISOString(),
+                initial_capital: initialCapital,
+                momentum_enabled: true,
+                technical_entries: true,
+                technical_exits: true,
+                stop_loss_enabled: true,
+                take_profit_enabled: true,
+                trailing_stop_enabled: true,
+                trail_pct: 0.02,
+                dynamic_sizing: true
+            };
+
+            document.getElementById('loadingContainer').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('comparisonContainer').style.display = 'none';
+
+            try {
+                const response = await axios.post('/api/v1/backtesting/run', params);
+                displayResults(response.data);
+            } catch (error) {
+                alert('Error running backtest: ' + (error.response?.data?.detail || error.message));
+            } finally {
+                document.getElementById('loadingContainer').style.display = 'none';
+            }
+        }
+
+        async function compareStrategies() {
+            const lookbackDays = parseInt(document.getElementById('lookbackDays').value);
+
+            document.getElementById('loadingContainer').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('comparisonContainer').style.display = 'none';
+
+            try {
+                const response = await axios.get(`/api/v1/backtesting/compare-strategies?lookback_days=${lookbackDays}`);
+                displayComparison(response.data);
+            } catch (error) {
+                alert('Error comparing strategies: ' + (error.response?.data?.detail || error.message));
+            } finally {
+                document.getElementById('loadingContainer').style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            const summary = data.summary;
+            
+            // Display metrics
+            const metricsHtml = `
+                <div class="metric-card">
+                    <div class="metric-label">Total Return</div>
+                    <div class="metric-value ${summary.total_return >= 0 ? 'positive' : 'negative'}">
+                        ${summary.total_return >= 0 ? '+' : ''}${summary.total_return_pct.toFixed(2)}%
+                    </div>
+                    <div style="color: #666;">$${summary.total_return.toFixed(2)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Win Rate</div>
+                    <div class="metric-value">${summary.win_rate.toFixed(1)}%</div>
+                    <div style="color: #666;">${summary.winning_trades}W / ${summary.losing_trades}L</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Profit Factor</div>
+                    <div class="metric-value ${summary.profit_factor >= 1 ? 'positive' : 'negative'}">
+                        ${summary.profit_factor.toFixed(2)}
+                    </div>
+                    <div style="color: #666;">Avg W/L: $${summary.avg_win.toFixed(0)}/$${Math.abs(summary.avg_loss).toFixed(0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Max Drawdown</div>
+                    <div class="metric-value negative">${summary.max_drawdown_pct.toFixed(2)}%</div>
+                    <div style="color: #666;">$${summary.max_drawdown.toFixed(2)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Sharpe Ratio</div>
+                    <div class="metric-value">${summary.sharpe_ratio.toFixed(2)}</div>
+                    <div style="color: #666;">Risk-adjusted return</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Total Trades</div>
+                    <div class="metric-value">${summary.num_trades}</div>
+                    <div style="color: #666;">${summary.trades_per_day.toFixed(1)} per day</div>
+                </div>
+            `;
+            document.getElementById('metricsGrid').innerHTML = metricsHtml;
+
+            // Display equity curve
+            if (data.equity_curve_points > 0) {
+                // Note: We'd need the actual equity curve data from the API
+                // For now, showing a placeholder
+                updateEquityChart([]);
+            }
+
+            document.getElementById('resultsContainer').style.display = 'block';
+        }
+
+        function displayComparison(data) {
+            const strategies = data.strategies;
+            const labels = Object.keys(strategies);
+            
+            const datasets = [
+                {
+                    label: 'Total Return %',
+                    data: labels.map(l => strategies[l].total_return_pct),
+                    backgroundColor: 'rgba(102, 126, 234, 0.8)'
+                },
+                {
+                    label: 'Win Rate %',
+                    data: labels.map(l => strategies[l].win_rate),
+                    backgroundColor: 'rgba(16, 185, 129, 0.8)'
+                },
+                {
+                    label: 'Sharpe Ratio',
+                    data: labels.map(l => strategies[l].sharpe_ratio * 10), // Scale for visibility
+                    backgroundColor: 'rgba(245, 158, 11, 0.8)'
+                }
+            ];
+
+            if (comparisonChart) {
+                comparisonChart.destroy();
+            }
+
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            comparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels.map(l => l.charAt(0).toUpperCase() + l.slice(1).replace('_', ' ')),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Strategy Comparison (${data.period.days} days)`
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('comparisonContainer').style.display = 'block';
+        }
+
+        function updateEquityChart(equityCurve) {
+            if (equityChart) {
+                equityChart.destroy();
+            }
+
+            const ctx = document.getElementById('equityChart').getContext('2d');
+            equityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: equityCurve.map(e => new Date(e.timestamp).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Portfolio Value',
+                        data: equityCurve.map(e => e.value),
+                        borderColor: 'rgb(102, 126, 234)',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize with aggressive preset selected
+        document.querySelector('.preset-btn:nth-child(2)').classList.add('active');
+    </script>
+</body>
+</html>

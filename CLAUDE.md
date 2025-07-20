@@ -671,22 +671,22 @@ The system currently has temporary modifications for aggressive autonomous tradi
 **Last Updated**: 2025-07-20
 
 ### Code Metrics
-- **Total Files**: 136
-- **Total Lines of Code**: 23,552
+- **Total Files**: 141
+- **Total Lines of Code**: 25,207
 
 ### Breakdown by Language
-- **Python (.py)**: 21,173 lines (89.9%)
-- **JavaScript (.js)**: 371 lines (1.6%)
-- **HTML (.html)**: 647 lines (2.7%)
-- **Shell Scripts (.sh)**: 1,106 lines (4.7%)
+- **Python (.py)**: 22,349 lines (88.7%)
+- **JavaScript (.js)**: 371 lines (1.5%)
+- **HTML (.html)**: 1,108 lines (4.4%)
+- **Shell Scripts (.sh)**: 1,106 lines (4.4%)
 - **YAML (.yaml/.yml)**: 217 lines (0.9%)
-- **SQL (.sql)**: 38 lines (0.2%)
+- **SQL (.sql)**: 38 lines (0.1%)
 - **Dockerfiles**: 18 lines (0.1%)
 
 ### Key Components
-- **API Endpoints**: 21 routers (added technical analysis, position sizing)
+- **API Endpoints**: 22 routers (added backtesting)
 - **Database Models**: 13 models
-- **Services**: 18+ business logic services
+- **Services**: 19+ business logic services
 - **Trading Strategies**: 8 autonomous strategies (added technical analysis)
 - **Middleware**: 4 middleware components
 - **Background Tasks**: 5 async workers
@@ -699,3 +699,5 @@ The system currently has temporary modifications for aggressive autonomous tradi
 - Telegram/Discord notifications (556 lines)
 - Technical indicators service (427 lines)
 - Position sizing service (341 lines)
+- Backtesting engine (655 lines)
+- Backtest viewer UI (461 lines)
