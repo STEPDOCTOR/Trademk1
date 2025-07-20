@@ -19,6 +19,7 @@ from app.models.trade_history import TradeReason
 from app.services.trading.alpaca_client import AlpacaClient
 from app.services.trading.position_manager import PositionManager
 from app.services.performance_tracker import performance_tracker
+from app.services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,16 @@ class ExecutionEngine:
                         reason=reason,
                         strategy_name=order.reason
                     )
+                    
+                    # Send notification
+                    await notification_service.send_trade_notification({
+                        "symbol": order.symbol,
+                        "side": order.side.value,
+                        "quantity": order.qty,
+                        "price": order.filled_price,
+                        "reason": order.reason,
+                        "profit_loss": position.unrealized_pnl if position and order.side == OrderSide.SELL else None
+                    })
                     
                 elif event == "partial_fill":
                     order.status = OrderStatus.PARTIAL

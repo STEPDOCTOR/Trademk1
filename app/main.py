@@ -30,6 +30,7 @@ from app.api.documentation import router as docs_router
 from app.api.autonomous import router as autonomous_router
 from app.api.performance import router as performance_router
 from app.api.dashboard import router as dashboard_router
+from app.api.notifications import router as notifications_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
@@ -42,6 +43,7 @@ from app.services.strategies.portfolio_manager import MultiStrategyPortfolioMana
 from app.services.trading.position_sync import PositionSyncService
 from app.services.strategies.autonomous_trader import AutonomousTrader
 from app.services.performance_tracker import performance_tracker
+from app.services.notification_service import notification_service
 from app import dependencies
 
 # Global references to background tasks
@@ -151,6 +153,10 @@ async def lifespan(app: FastAPI):
         await performance_tracker.initialize()
         background_tasks.append(performance_tracker._update_task)
         logger.info("Performance tracker initialized")
+        
+        # Initialize notification service
+        await notification_service.initialize()
+        logger.info("Notification service initialized")
         
         # Initialize autonomous trader
         autonomous_trader = AutonomousTrader(execution_engine)
@@ -343,6 +349,9 @@ def create_app() -> FastAPI:
     
     # Performance tracking
     app.include_router(performance_router)
+    
+    # Notifications
+    app.include_router(notifications_router)
     
     # Real-time and admin
     app.include_router(websocket_router)

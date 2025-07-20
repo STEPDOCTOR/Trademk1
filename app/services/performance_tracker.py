@@ -11,6 +11,7 @@ from app.models.position import Position
 from app.models.order import Order
 from app.db.postgres import get_session
 from app.monitoring.logger import get_logger
+from app.services.notification_service import notification_service
 
 logger = get_logger(__name__)
 
@@ -223,10 +224,28 @@ class PerformanceTracker:
         if status["loss_limit_hit"]:
             logger.warning(f"Daily loss limit hit! Current P&L: ${current_pnl:.2f}")
             await self._record_limit_hit("loss", current_pnl)
+            await notification_service.send_limit_notification({
+                "type": "loss",
+                "current_pnl": current_pnl,
+                "limit": daily_loss_limit
+            })
+        elif status["pct_to_loss_limit"] > 80:
+            # Send warning at 80% of limit
+            await notification_service.send_limit_notification({
+                "type": "warning",
+                "current_pnl": current_pnl,
+                "percentage": status["pct_to_loss_limit"],
+                "limit": daily_loss_limit
+            })
         
         if status["profit_target_hit"]:
             logger.info(f"Daily profit target hit! Current P&L: ${current_pnl:.2f}")
             await self._record_limit_hit("profit", current_pnl)
+            await notification_service.send_limit_notification({
+                "type": "profit",
+                "current_pnl": current_pnl,
+                "target": daily_profit_target
+            })
         
         return status
     

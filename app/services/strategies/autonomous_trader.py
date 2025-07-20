@@ -16,6 +16,7 @@ from app.models.trailing_stop import TrailingStop
 from app.services.trading.execution_engine import ExecutionEngine
 from app.db.questdb import get_questdb_pool
 from app.services.performance_tracker import performance_tracker
+from app.services.notification_service import notification_service, NotificationType
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +313,19 @@ class AutonomousTrader:
                 if trailing_stop.check_triggered(current_price):
                     await db.commit()
                     logger.warning(f"Trailing stop triggered for {position.symbol} at ${current_price:.2f}")
+                    
+                    # Send notification
+                    await notification_service.send_notification(
+                        NotificationType.TRAILING_STOP_HIT,
+                        f"Trailing Stop Hit: {position.symbol}",
+                        f"Price dropped to ${current_price:.2f}\nStop was at ${trailing_stop.stop_price:.2f}\nHighest price: ${trailing_stop.highest_price:.2f}",
+                        {
+                            "symbol": position.symbol,
+                            "current_price": current_price,
+                            "stop_price": trailing_stop.stop_price,
+                            "highest_price": trailing_stop.highest_price
+                        }
+                    )
                     
                     return TradingSignal(
                         symbol=position.symbol,
