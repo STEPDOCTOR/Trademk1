@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bot Dashboard - Mobile</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .profit { color: #10b981; font-weight: bold; }
+        .loss { color: #ef4444; font-weight: bold; }
+        body { 
+            background: #f3f4f6; 
+            padding-bottom: 60px; /* Space for fixed bottom nav */
+        }
+        .metric-value { font-size: 1.5rem; font-weight: bold; }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-around;
+            padding: 0.5rem 0;
+            z-index: 1000;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0.25rem 1rem;
+            color: #6b7280;
+            text-decoration: none;
+            font-size: 0.75rem;
+        }
+        .nav-item.active {
+            color: #3b82f6;
+        }
+        .card {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .alert {
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        .alert.success {
+            background: #d1fae5;
+            border-color: #a7f3d0;
+            color: #065f46;
+        }
+        .alert.warning {
+            background: #fef3c7;
+            border-color: #fde68a;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="bg-gray-900 text-white p-4 flex justify-between items-center">
+        <div class="flex items-center">
+            <i class="fas fa-robot text-xl mr-2 text-green-400"></i>
+            <span class="font-bold">Aggressive Bot</span>
+        </div>
+        <span id="botStatus" class="text-sm px-2 py-1 rounded bg-gray-700">
+            <i class="fas fa-circle text-gray-400"></i> Loading...
+        </span>
+    </div>
+
+    <!-- Main Content -->
+    <div class="p-4">
+        <!-- Alerts -->
+        <div id="alertContainer"></div>
+
+        <!-- Key Metrics -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="card">
+                <div class="text-gray-600 text-sm mb-1">Total P&L</div>
+                <div id="totalPnL" class="metric-value">--</div>
+                <div id="totalPnLPct" class="text-sm text-gray-500">--</div>
+            </div>
+            <div class="card">
+                <div class="text-gray-600 text-sm mb-1">Today's P&L</div>
+                <div id="todayPnL" class="metric-value">--</div>
+                <div id="winRate" class="text-sm text-gray-500">--</div>
+            </div>
+        </div>
+
+        <!-- Daily Limits -->
+        <div class="card mb-4">
+            <h3 class="font-semibold mb-3">Daily Limits</h3>
+            
+            <!-- Loss Limit -->
+            <div class="mb-3">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-gray-600">Loss Limit</span>
+                    <span id="lossLimitText" class="text-red-600">$0 / $1,000</span>
+                </div>
+                <div class="w-full bg-red-100 rounded-full h-2">
+                    <div id="lossLimitBar" class="bg-red-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- Profit Target -->
+            <div>
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-gray-600">Profit Target</span>
+                    <span id="profitTargetText" class="text-green-600">$0 / $2,000</span>
+                </div>
+                <div class="w-full bg-green-100 rounded-full h-2">
+                    <div id="profitTargetBar" class="bg-green-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div id="tradesTab" class="tab-content">
+            <h3 class="font-semibold mb-3">Recent Trades</h3>
+            <div id="tradesContainer"></div>
+        </div>
+
+        <div id="positionsTab" class="tab-content hidden">
+            <h3 class="font-semibold mb-3">Open Positions</h3>
+            <div id="positionsContainer"></div>
+        </div>
+
+        <div id="statsTab" class="tab-content hidden">
+            <h3 class="font-semibold mb-3">Statistics</h3>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="card">
+                    <div class="text-gray-600 text-sm">Trades Today</div>
+                    <div id="tradesToday" class="text-xl font-bold">--</div>
+                </div>
+                <div class="card">
+                    <div class="text-gray-600 text-sm">Win Rate</div>
+                    <div id="winRateStat" class="text-xl font-bold">--</div>
+                </div>
+                <div class="card">
+                    <div class="text-gray-600 text-sm">Positions</div>
+                    <div id="openPositions" class="text-xl font-bold">--</div>
+                </div>
+                <div class="card">
+                    <div class="text-gray-600 text-sm">Position Value</div>
+                    <div id="positionValue" class="text-xl font-bold">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <a href="#" class="nav-item active" onclick="showTab('trades')">
+            <i class="fas fa-exchange-alt text-xl mb-1"></i>
+            Trades
+        </a>
+        <a href="#" class="nav-item" onclick="showTab('positions')">
+            <i class="fas fa-briefcase text-xl mb-1"></i>
+            Positions
+        </a>
+        <a href="#" class="nav-item" onclick="showTab('stats')">
+            <i class="fas fa-chart-bar text-xl mb-1"></i>
+            Stats
+        </a>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.2.0/dist/axios.min.js"></script>
+    <script>
+        const API_BASE = '/api/v1';
+        let currentTab = 'trades';
+
+        function formatMoney(value) {
+            const formatted = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(Math.abs(value));
+            
+            if (value > 0) {
+                return `<span class="profit">+${formatted}</span>`;
+            } else if (value < 0) {
+                return `<span class="loss">-${formatted.substring(1)}</span>`;
+            }
+            return formatted;
+        }
+
+        function formatPercent(value) {
+            const formatted = `${Math.abs(value).toFixed(1)}%`;
+            if (value > 0) {
+                return `<span class="profit">+${formatted}</span>`;
+            } else if (value < 0) {
+                return `<span class="loss">-${formatted}</span>`;
+            }
+            return formatted;
+        }
+
+        function showTab(tab) {
+            currentTab = tab;
+            
+            // Update nav
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.nav-item').classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(tab + 'Tab').classList.remove('hidden');
+            
+            return false;
+        }
+
+        async function updateMetrics() {
+            try {
+                const response = await axios.get(`${API_BASE}/performance/realtime`);
+                const data = response.data;
+                
+                // Update metrics
+                document.getElementById('totalPnL').innerHTML = formatMoney(data.total_pnl || 0);
+                document.getElementById('totalPnLPct').innerHTML = formatPercent(data.total_pnl_pct || 0);
+                document.getElementById('todayPnL').innerHTML = formatMoney(data.realized_pnl || 0);
+                
+                if (data.trades_today > 0) {
+                    const winRate = (data.winning_trades_today / data.trades_today * 100);
+                    document.getElementById('winRate').innerHTML = `${winRate.toFixed(0)}% Win Rate`;
+                    document.getElementById('winRateStat').innerHTML = `${winRate.toFixed(0)}%`;
+                }
+                
+                document.getElementById('tradesToday').textContent = data.trades_today || 0;
+                document.getElementById('openPositions').textContent = data.open_positions || 0;
+                document.getElementById('positionValue').innerHTML = formatMoney(data.total_position_value || 0);
+                
+                // Update limits
+                if (data.limit_status) {
+                    updateLimits(data.limit_status);
+                    updateAlerts(data.limit_status);
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function updateLimits(limitStatus) {
+            const currentPnL = limitStatus.current_pnl || 0;
+            const lossLimit = Math.abs(limitStatus.loss_limit || 1000);
+            const profitTarget = limitStatus.profit_target || 2000;
+            
+            if (currentPnL < 0) {
+                const lossPct = Math.min(100, Math.abs(currentPnL) / lossLimit * 100);
+                document.getElementById('lossLimitBar').style.width = `${lossPct}%`;
+                document.getElementById('lossLimitText').textContent = 
+                    `$${Math.abs(currentPnL).toFixed(0)} / $${lossLimit}`;
+                document.getElementById('profitTargetBar').style.width = '0%';
+            } else {
+                const profitPct = Math.min(100, currentPnL / profitTarget * 100);
+                document.getElementById('profitTargetBar').style.width = `${profitPct}%`;
+                document.getElementById('profitTargetText').textContent = 
+                    `$${currentPnL.toFixed(0)} / $${profitTarget}`;
+                document.getElementById('lossLimitBar').style.width = '0%';
+            }
+        }
+
+        function updateAlerts(limitStatus) {
+            const container = document.getElementById('alertContainer');
+            container.innerHTML = '';
+            
+            if (limitStatus.loss_limit_hit) {
+                container.innerHTML = `
+                    <div class="alert">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        Daily loss limit hit! Trading stopped.
+                    </div>`;
+            } else if (limitStatus.pct_to_loss_limit > 80) {
+                container.innerHTML = `
+                    <div class="alert warning">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Warning: ${limitStatus.pct_to_loss_limit.toFixed(0)}% of loss limit
+                    </div>`;
+            } else if (limitStatus.profit_target_hit) {
+                container.innerHTML = `
+                    <div class="alert success">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        Profit target reached!
+                    </div>`;
+            }
+        }
+
+        async function updateBotStatus() {
+            try {
+                const response = await axios.get(`${API_BASE}/autonomous/status`);
+                const status = response.data;
+                
+                const statusElement = document.getElementById('botStatus');
+                if (status.running) {
+                    statusElement.innerHTML = '<i class="fas fa-circle text-green-400"></i> Running';
+                    statusElement.className = 'text-sm px-2 py-1 rounded bg-green-900';
+                } else {
+                    statusElement.innerHTML = '<i class="fas fa-circle text-red-400"></i> Stopped';
+                    statusElement.className = 'text-sm px-2 py-1 rounded bg-red-900';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function updateTrades() {
+            try {
+                const response = await axios.get(`${API_BASE}/performance/trades/recent?limit=10`);
+                const trades = response.data;
+                
+                const container = document.getElementById('tradesContainer');
+                if (trades.length === 0) {
+                    container.innerHTML = '<div class="text-gray-400 text-center py-4">No recent trades</div>';
+                    return;
+                }
+                
+                container.innerHTML = trades.map(trade => {
+                    const time = new Date(trade.executed_at).toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                    return `
+                        <div class="card flex justify-between items-center">
+                            <div>
+                                <div class="font-medium">${trade.symbol}</div>
+                                <div class="text-sm text-gray-500">${time} • ${trade.reason}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm ${trade.type === 'buy' ? 'text-green-600' : 'text-red-600'}">
+                                    ${trade.type.toUpperCase()}
+                                </div>
+                                <div class="text-sm">
+                                    ${trade.profit_loss ? formatMoney(trade.profit_loss) : '--'}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function updatePositions() {
+            try {
+                const response = await axios.get(`${API_BASE}/trading/positions`);
+                const positions = response.data.positions || [];
+                
+                const container = document.getElementById('positionsContainer');
+                if (positions.length === 0) {
+                    container.innerHTML = '<div class="text-gray-400 text-center py-4">No open positions</div>';
+                    return;
+                }
+                
+                container.innerHTML = positions.map(pos => `
+                    <div class="card flex justify-between items-center">
+                        <div>
+                            <div class="font-medium">${pos.symbol}</div>
+                            <div class="text-sm text-gray-500">${pos.qty} @ $${pos.avg_price.toFixed(2)}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-lg">${formatMoney(pos.unrealized_pnl || 0)}</div>
+                            <div class="text-sm text-gray-500">$${pos.market_value.toFixed(0)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Initialize
+        async function init() {
+            await updateBotStatus();
+            await updateMetrics();
+            await updateTrades();
+            await updatePositions();
+            
+            setInterval(updateMetrics, 5000);
+            setInterval(updateBotStatus, 10000);
+            setInterval(() => {
+                if (currentTab === 'trades') updateTrades();
+                if (currentTab === 'positions') updatePositions();
+            }, 10000);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -8,5 +8,6 @@ from app.models.order import Order
 from app.models.position import Position
 from app.models.trade_history import TradeHistory
 from app.models.performance_metrics import DailyPerformance, RealtimeMetrics
+from app.models.trailing_stop import TrailingStop
 
-__all__ = ["Base", "User", "Symbol", "Config", "Order", "Position", "TradeHistory", "DailyPerformance", "RealtimeMetrics"]
+__all__ = ["Base", "User", "Symbol", "Config", "Order", "Position", "TradeHistory", "DailyPerformance", "RealtimeMetrics", "TrailingStop"]

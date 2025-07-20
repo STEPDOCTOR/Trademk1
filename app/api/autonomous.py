@@ -1,7 +1,7 @@
 """API endpoints for autonomous trading control."""
 from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user, AuthUser
@@ -232,3 +232,66 @@ async def update_daily_limits(
             "stop_on_profit": stop_on_profit
         }
     }
+
+
+@router.patch("/trailing-stop")
+async def update_trailing_stop(
+    enabled: bool = Query(True, description="Enable trailing stops"),
+    trail_percent: float = Query(0.02, ge=0.001, le=0.1, description="Trailing stop percentage (0.02 = 2%)"),
+    activate_after_profit: float = Query(0.01, ge=0, le=0.1, description="Minimum profit to activate trailing stop"),
+    current_user: AuthUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Update trailing stop configuration."""
+    if not dependencies.autonomous_trader:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Autonomous trading system not initialized"
+        )
+    
+    dependencies.autonomous_trader.update_strategy(StrategyType.TRAILING_STOP,
+        enabled=enabled,
+        trail_percent=trail_percent,
+        activate_after_profit_pct=activate_after_profit
+    )
+    
+    return {
+        "status": "updated",
+        "trailing_stop": {
+            "enabled": enabled,
+            "trail_percent": trail_percent,
+            "trail_percent_display": f"{trail_percent * 100:.1f}%",
+            "activate_after_profit": activate_after_profit,
+            "activate_after_profit_display": f"{activate_after_profit * 100:.1f}%"
+        }
+    }
+
+
+@router.get("/trailing-stops")
+async def get_trailing_stops(
+    current_user: AuthUser = Depends(get_current_user)
+) -> List[Dict[str, Any]]:
+    """Get all active trailing stops."""
+    from app.models.trailing_stop import TrailingStop
+    from sqlalchemy import select
+    from app.db.postgres import get_session
+    
+    async with get_session() as session:
+        stops = await session.scalars(
+            select(TrailingStop).where(TrailingStop.is_active == True)
+        )
+        
+        return [
+            {
+                "symbol": stop.symbol,
+                "enabled": stop.enabled,
+                "trail_percent": stop.trail_percent,
+                "initial_price": stop.initial_price,
+                "highest_price": stop.highest_price,
+                "stop_price": stop.stop_price,
+                "last_updated": stop.last_updated.isoformat() if stop.last_updated else None,
+                "times_adjusted": stop.times_adjusted,
+                "profit_from_initial": ((stop.highest_price - stop.initial_price) / stop.initial_price * 100),
+                "distance_to_stop": ((stop.highest_price - stop.stop_price) / stop.highest_price * 100)
+            }
+            for stop in stops
+        ]

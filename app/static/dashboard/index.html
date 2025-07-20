@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aggressive Bot Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.2.0/dist/axios.min.js"></script>
+    <style>
+        .profit { color: #10b981; }
+        .loss { color: #ef4444; }
+        .blink { animation: blink 1s infinite; }
+        @keyframes blink { 
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .metric-card {
+            position: relative;
+            overflow: hidden;
+        }
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+        .metric-card:hover::before {
+            left: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <nav class="bg-gray-900 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <i class="fas fa-robot text-2xl text-green-400"></i>
+                <h1 class="text-2xl font-bold">Aggressive Trading Bot</h1>
+                <span id="botStatus" class="px-3 py-1 rounded-full text-sm bg-gray-700">
+                    <i class="fas fa-circle text-gray-400 blink"></i> Checking...
+                </span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span id="marketStatus" class="text-sm">Market: --</span>
+                <span id="currentTime" class="text-sm">--:--:--</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mx-auto p-6">
+        <!-- Alert Banner -->
+        <div id="alertBanner" class="hidden mb-6 p-4 rounded-lg shadow-md">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i id="alertIcon" class="fas fa-exclamation-circle text-2xl mr-3"></i>
+                    <div>
+                        <h3 id="alertTitle" class="font-bold"></h3>
+                        <p id="alertMessage" class="text-sm"></p>
+                    </div>
+                </div>
+                <button onclick="dismissAlert()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <!-- Total P&L -->
+            <div class="card metric-card p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-sm">Total P&L</p>
+                        <h2 id="totalPnL" class="text-3xl font-bold mt-1">--</h2>
+                        <p id="totalPnLPct" class="text-sm mt-1">--</p>
+                    </div>
+                    <i class="fas fa-chart-line text-3xl text-gray-300"></i>
+                </div>
+            </div>
+
+            <!-- Today's P&L -->
+            <div class="card metric-card p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-sm">Today's P&L</p>
+                        <h2 id="todayPnL" class="text-3xl font-bold mt-1">--</h2>
+                        <p id="dailyProgress" class="text-sm mt-1">--</p>
+                    </div>
+                    <i class="fas fa-calendar-day text-3xl text-gray-300"></i>
+                </div>
+            </div>
+
+            <!-- Win Rate -->
+            <div class="card metric-card p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-sm">Win Rate</p>
+                        <h2 id="winRate" class="text-3xl font-bold mt-1">--</h2>
+                        <p id="winLoss" class="text-sm mt-1">--</p>
+                    </div>
+                    <i class="fas fa-percentage text-3xl text-gray-300"></i>
+                </div>
+            </div>
+
+            <!-- Open Positions -->
+            <div class="card metric-card p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-600 text-sm">Open Positions</p>
+                        <h2 id="openPositions" class="text-3xl font-bold mt-1">--</h2>
+                        <p id="positionValue" class="text-sm mt-1">--</p>
+                    </div>
+                    <i class="fas fa-briefcase text-3xl text-gray-300"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Limits Progress -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Loss Limit -->
+            <div class="card p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold mb-3">Daily Loss Limit</h3>
+                <div class="relative pt-1">
+                    <div class="flex mb-2 items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold inline-block text-red-600">
+                                Current Loss
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <span id="lossLimitText" class="text-xs font-semibold inline-block text-red-600">
+                                $0 / $1,000
+                            </span>
+                        </div>
+                    </div>
+                    <div class="overflow-hidden h-3 mb-4 text-xs flex rounded bg-red-100">
+                        <div id="lossLimitBar" style="width:0%" 
+                             class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-500 transition-all duration-500"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profit Target -->
+            <div class="card p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold mb-3">Daily Profit Target</h3>
+                <div class="relative pt-1">
+                    <div class="flex mb-2 items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold inline-block text-green-600">
+                                Current Profit
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <span id="profitTargetText" class="text-xs font-semibold inline-block text-green-600">
+                                $0 / $2,000
+                            </span>
+                        </div>
+                    </div>
+                    <div class="overflow-hidden h-3 mb-4 text-xs flex rounded bg-green-100">
+                        <div id="profitTargetBar" style="width:0%" 
+                             class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500 transition-all duration-500"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- P&L Chart -->
+            <div class="card p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold mb-4">P&L Over Time</h3>
+                <canvas id="pnlChart" height="200"></canvas>
+            </div>
+
+            <!-- Trade Distribution -->
+            <div class="card p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold mb-4">Trade Distribution</h3>
+                <canvas id="tradeChart" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Tables Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Recent Trades -->
+            <div class="card p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold mb-4">Recent Trades</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-2 text-sm text-gray-600">Time</th>
+                                <th class="text-left py-2 text-sm text-gray-600">Symbol</th>
+                                <th class="text-left py-2 text-sm text-gray-600">Type</th>
+                                <th class="text-right py-2 text-sm text-gray-600">P&L</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tradesTable" class="text-sm">
+                            <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Active Positions -->
+            <div class="card p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-semibold mb-4">Active Positions</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-2 text-sm text-gray-600">Symbol</th>
+                                <th class="text-left py-2 text-sm text-gray-600">Qty</th>
+                                <th class="text-left py-2 text-sm text-gray-600">Avg Price</th>
+                                <th class="text-right py-2 text-sm text-gray-600">P&L</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsTable" class="text-sm">
+                            <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/dashboard/dashboard.js"></script>
+</body>
+</html>

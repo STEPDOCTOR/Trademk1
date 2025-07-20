@@ -12,6 +12,7 @@ import numpy as np
 from app.db.optimized_postgres import optimized_db
 from app.models.position import Position
 from app.models.symbol import Symbol
+from app.models.trailing_stop import TrailingStop
 from app.services.trading.execution_engine import ExecutionEngine
 from app.db.questdb import get_questdb_pool
 from app.services.performance_tracker import performance_tracker
@@ -36,6 +37,7 @@ class StrategyType(str, Enum):
     STOP_LOSS = "stop_loss"
     TAKE_PROFIT = "take_profit"
     DAILY_LIMITS = "daily_limits"
+    TRAILING_STOP = "trailing_stop"
 
 
 @dataclass
@@ -72,6 +74,7 @@ class AutonomousTrader:
             StrategyType.STOP_LOSS: AutonomousStrategy(StrategyType.STOP_LOSS),
             StrategyType.TAKE_PROFIT: AutonomousStrategy(StrategyType.TAKE_PROFIT),
             StrategyType.DAILY_LIMITS: AutonomousStrategy(StrategyType.DAILY_LIMITS),
+            StrategyType.TRAILING_STOP: AutonomousStrategy(StrategyType.TRAILING_STOP),
         }
         # Configure daily limits
         self.strategies[StrategyType.DAILY_LIMITS].enabled = True
@@ -79,6 +82,12 @@ class AutonomousTrader:
         self.strategies[StrategyType.DAILY_LIMITS].daily_profit_target = 2000  # $2,000 profit target
         self.strategies[StrategyType.DAILY_LIMITS].stop_on_loss_limit = True
         self.strategies[StrategyType.DAILY_LIMITS].stop_on_profit_target = False
+        
+        # Configure trailing stops
+        self.strategies[StrategyType.TRAILING_STOP].enabled = True
+        self.strategies[StrategyType.TRAILING_STOP].trail_percent = 0.02  # 2% trailing stop
+        self.strategies[StrategyType.TRAILING_STOP].activate_after_profit_pct = 0.01  # Activate after 1% profit
+        
         self.check_interval = 60  # Check every minute
         self.last_rebalance = datetime.utcnow()
         
@@ -94,6 +103,13 @@ class AutonomousTrader:
         current_price = position.last_price
         avg_price = position.avg_price
         pnl_pct = (current_price - avg_price) / avg_price
+        
+        # Trailing Stop Check
+        if self.strategies[StrategyType.TRAILING_STOP].enabled:
+            trailing_signal = await self._check_trailing_stop(position, current_price, pnl_pct)
+            if trailing_signal:
+                signals.append(trailing_signal)
+                return signals  # Exit immediately if trailing stop hit
         
         # Stop Loss Check
         if self.strategies[StrategyType.STOP_LOSS].enabled:
@@ -253,6 +269,58 @@ class AutonomousTrader:
         if len(prices) < 2:
             return 0.0
         return (prices[0] - prices[-1]) / prices[-1]
+    
+    async def _check_trailing_stop(self, position: Position, current_price: float, pnl_pct: float) -> Optional[TradingSignal]:
+        """Check and update trailing stop for a position."""
+        async with optimized_db.get_session() as db:
+            # Get or create trailing stop
+            trailing_stop = await db.scalar(
+                select(TrailingStop).where(TrailingStop.symbol == position.symbol)
+            )
+            
+            if not trailing_stop:
+                # Only create trailing stop if position is profitable enough
+                min_profit = self.strategies[StrategyType.TRAILING_STOP].activate_after_profit_pct
+                if pnl_pct < min_profit:
+                    return None
+                
+                # Create new trailing stop
+                trail_pct = self.strategies[StrategyType.TRAILING_STOP].trail_percent
+                trailing_stop = TrailingStop(
+                    symbol=position.symbol,
+                    trail_percent=trail_pct,
+                    initial_price=position.avg_price,
+                    highest_price=current_price,
+                    stop_price=current_price * (1 - trail_pct),
+                    enabled=True,
+                    is_active=True
+                )
+                db.add(trailing_stop)
+                await db.commit()
+                logger.info(f"Created trailing stop for {position.symbol} at ${trailing_stop.stop_price:.2f}")
+                return None
+            
+            # Update trailing stop
+            if trailing_stop.is_active:
+                # Update the stop price if we have a new high
+                updated = trailing_stop.update_stop(current_price)
+                if updated:
+                    await db.commit()
+                    logger.info(f"Updated trailing stop for {position.symbol} to ${trailing_stop.stop_price:.2f}")
+                
+                # Check if stop is triggered
+                if trailing_stop.check_triggered(current_price):
+                    await db.commit()
+                    logger.warning(f"Trailing stop triggered for {position.symbol} at ${current_price:.2f}")
+                    
+                    return TradingSignal(
+                        symbol=position.symbol,
+                        side="sell",
+                        qty=position.qty,
+                        reason=f"Trailing stop: price ${current_price:.2f} <= stop ${trailing_stop.stop_price:.2f}"
+                    )
+            
+            return None
         
     async def _get_top_movers(self) -> List[tuple[str, float]]:
         """Get top moving symbols in last 24 hours."""

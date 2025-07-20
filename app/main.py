@@ -29,6 +29,7 @@ from app.api.versioning import check_api_version
 from app.api.documentation import router as docs_router
 from app.api.autonomous import router as autonomous_router
 from app.api.performance import router as performance_router
+from app.api.dashboard import router as dashboard_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
@@ -349,6 +350,16 @@ def create_app() -> FastAPI:
     
     # Documentation and versioning
     app.include_router(docs_router)
+    
+    # Dashboard
+    app.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
+    
+    # Mount static files for dashboard
+    from fastapi.staticfiles import StaticFiles
+    import os
+    static_dir = os.path.join(os.path.dirname(__file__), "static", "dashboard")
+    if os.path.exists(static_dir):
+        app.mount("/static/dashboard", StaticFiles(directory=static_dir), name="dashboard-static")
     
     @app.get("/")
     async def root():
