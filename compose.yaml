@@ -31,7 +31,9 @@ services:
       # Only mount files that aren't being watched
       - ./alembic.ini:/app/alembic.ini
       - ./docker/entrypoint.sh:/app/docker/entrypoint.sh
+      - ./docker/entrypoint-temp.sh:/app/docker/entrypoint-temp.sh
       - ./docker/wait-for-it.sh:/app/docker/wait-for-it.sh
+    entrypoint: ["/app/docker/entrypoint-temp.sh"]
     depends_on:
       - db
       - redis

@@ -65,3 +65,22 @@ tmp/
 temp/
 *.tmp
 *.temp
+
+# Temporary aggressive mode activation scripts
+ACTIVATE_*.sh
+ACTIVATE_*.py
+START_*.sh
+START_*.py
+ENABLE_*.py
+FINAL_*.py
+MAKE_*.sh
+MONITOR_*.sh
+BOT_*.sh
+adjust_*.py
+manage.py
+start_autonomous.py
+start_bot_simple.py
+start_trading.sh
+app/activate_bot.py
+app/start_bot_internal.py
+docker/entrypoint-temp.sh

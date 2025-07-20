@@ -174,3 +174,23 @@ async def get_position_summary(
         )
     
     return await dependencies.position_sync_service.get_position_summary()
+
+
+# TEMPORARY: Internal endpoint for starting without auth (remove in production)
+@router.post("/internal/start")
+async def start_autonomous_internal() -> Dict[str, str]:
+    """Internal endpoint to start autonomous trading (NO AUTH - REMOVE IN PRODUCTION)."""
+    if not dependencies.autonomous_trader:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Autonomous trading system not initialized"
+        )
+    
+    if dependencies.autonomous_trader.running:
+        return {"status": "already_running", "message": "Autonomous trading is already running"}
+    
+    # Start in background
+    import asyncio
+    asyncio.create_task(dependencies.autonomous_trader.run())
+    
+    return {"status": "started", "message": "Autonomous trading system started (NO AUTH MODE)"}

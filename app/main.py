@@ -147,8 +147,47 @@ async def lifespan(app: FastAPI):
         # Initialize autonomous trader
         autonomous_trader = AutonomousTrader(execution_engine)
         dependencies.autonomous_trader = autonomous_trader
-        # Don't start automatically - let user control via API
-        logger.info("Autonomous trader initialized (not started)")
+        
+        # Configure aggressive settings for immediate trading
+        logger.info("Configuring aggressive autonomous trading settings...")
+        
+        # Ultra-aggressive momentum settings
+        autonomous_trader.update_strategy('momentum',
+            enabled=True,
+            momentum_threshold=0.001,      # 0.1% - extremely sensitive
+            momentum_lookback_hours=1,     # Just look at last hour
+            position_size_pct=0.03,        # 3% of portfolio (~$2,200)
+            max_positions=25
+        )
+        
+        # Tighter risk management
+        autonomous_trader.update_strategy('stop_loss',
+            enabled=True,
+            stop_loss_pct=0.02  # 2% stop loss
+        )
+        
+        autonomous_trader.update_strategy('take_profit',
+            enabled=True,
+            take_profit_pct=0.05  # 5% take profit
+        )
+        
+        # Disable rebalancing to focus on momentum
+        autonomous_trader.update_strategy('portfolio_rebalance', enabled=False)
+        
+        # Set very frequent checking
+        autonomous_trader.check_interval = 15  # Check every 15 seconds
+        
+        logger.info("Autonomous trader settings:")
+        logger.info("  • Momentum: 0.1% threshold (ultra-sensitive)")
+        logger.info("  • Check interval: 15 seconds")
+        logger.info("  • Position size: 3% (~$2,200)")
+        logger.info("  • Stop loss: 2%")
+        logger.info("  • Take profit: 5%")
+        
+        # Start autonomous trader automatically
+        autonomous_trader_task = asyncio.create_task(autonomous_trader.run())
+        background_tasks.append(autonomous_trader_task)
+        logger.info("🚀 Autonomous trader started with aggressive settings!")
     else:
         logger.warning("Alpaca credentials not configured, skipping Alpaca client, OMS, and portfolio manager")
     
