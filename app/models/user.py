@@ -58,6 +58,7 @@ class User(Base):
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     portfolio = relationship("UserPortfolio", back_populates="user", uselist=False, cascade="all, delete-orphan")
     preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    trade_history = relationship("TradeHistory", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         """String representation of User."""

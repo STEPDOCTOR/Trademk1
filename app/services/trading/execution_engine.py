@@ -15,8 +15,10 @@ from app.db.postgres import get_db_session
 from app.db.optimized_postgres import optimized_db
 from app.models.order import Order, OrderSide, OrderType, OrderStatus
 from app.models.config import Config
+from app.models.trade_history import TradeReason
 from app.services.trading.alpaca_client import AlpacaClient
 from app.services.trading.position_manager import PositionManager
+from app.services.performance_tracker import performance_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -196,12 +198,30 @@ class ExecutionEngine:
                     order.filled_price = float(order_data.get("filled_avg_price", 0))
                     
                     # Update position
-                    await self.position_manager.update_position_on_fill(
+                    position = await self.position_manager.update_position_on_fill(
                         db,
                         symbol=order.symbol,
                         side=order.side.value,
                         qty=order.qty,
                         price=order.filled_price
+                    )
+                    
+                    # Record trade in history
+                    reason = TradeReason.MANUAL
+                    if order.reason:
+                        reason_map = {
+                            "momentum": TradeReason.MOMENTUM,
+                            "stop_loss": TradeReason.STOP_LOSS,
+                            "take_profit": TradeReason.TAKE_PROFIT,
+                            "rebalance": TradeReason.REBALANCE
+                        }
+                        reason = reason_map.get(order.reason.lower(), TradeReason.MANUAL)
+                    
+                    await performance_tracker.record_trade(
+                        order=order,
+                        position=position,
+                        reason=reason,
+                        strategy_name=order.reason
                     )
                     
                 elif event == "partial_fill":

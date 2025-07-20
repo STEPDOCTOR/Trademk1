@@ -194,3 +194,41 @@ async def start_autonomous_internal() -> Dict[str, str]:
     asyncio.create_task(dependencies.autonomous_trader.run())
     
     return {"status": "started", "message": "Autonomous trading system started (NO AUTH MODE)"}
+
+
+@router.patch("/daily-limits")
+async def update_daily_limits(
+    loss_limit: float = Query(..., description="Daily loss limit (as positive number, will be negated)"),
+    profit_target: float = Query(..., description="Daily profit target"),
+    stop_on_loss: bool = Query(True, description="Stop trading when loss limit hit"),
+    stop_on_profit: bool = Query(False, description="Stop trading when profit target hit"),
+    current_user: AuthUser = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Update daily trading limits."""
+    if not dependencies.autonomous_trader:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Autonomous trading system not initialized"
+        )
+    
+    # Ensure loss limit is negative and profit target is positive
+    loss_limit = -abs(loss_limit)
+    profit_target = abs(profit_target)
+    
+    dependencies.autonomous_trader.update_strategy(StrategyType.DAILY_LIMITS,
+        enabled=True,
+        daily_loss_limit=loss_limit,
+        daily_profit_target=profit_target,
+        stop_on_loss_limit=stop_on_loss,
+        stop_on_profit_target=stop_on_profit
+    )
+    
+    return {
+        "status": "updated",
+        "daily_limits": {
+            "loss_limit": loss_limit,
+            "profit_target": profit_target,
+            "stop_on_loss": stop_on_loss,
+            "stop_on_profit": stop_on_profit
+        }
+    }

@@ -14,6 +14,7 @@ from app.models.position import Position
 from app.models.symbol import Symbol
 from app.services.trading.execution_engine import ExecutionEngine
 from app.db.questdb import get_questdb_pool
+from app.services.performance_tracker import performance_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class StrategyType(str, Enum):
     PORTFOLIO_REBALANCE = "portfolio_rebalance"
     STOP_LOSS = "stop_loss"
     TAKE_PROFIT = "take_profit"
+    DAILY_LIMITS = "daily_limits"
 
 
 @dataclass
@@ -69,7 +71,14 @@ class AutonomousTrader:
             StrategyType.PORTFOLIO_REBALANCE: AutonomousStrategy(StrategyType.PORTFOLIO_REBALANCE),
             StrategyType.STOP_LOSS: AutonomousStrategy(StrategyType.STOP_LOSS),
             StrategyType.TAKE_PROFIT: AutonomousStrategy(StrategyType.TAKE_PROFIT),
+            StrategyType.DAILY_LIMITS: AutonomousStrategy(StrategyType.DAILY_LIMITS),
         }
+        # Configure daily limits
+        self.strategies[StrategyType.DAILY_LIMITS].enabled = True
+        self.strategies[StrategyType.DAILY_LIMITS].daily_loss_limit = -1000  # $1,000 loss limit
+        self.strategies[StrategyType.DAILY_LIMITS].daily_profit_target = 2000  # $2,000 profit target
+        self.strategies[StrategyType.DAILY_LIMITS].stop_on_loss_limit = True
+        self.strategies[StrategyType.DAILY_LIMITS].stop_on_profit_target = False
         self.check_interval = 60  # Check every minute
         self.last_rebalance = datetime.utcnow()
         
@@ -288,6 +297,30 @@ class AutonomousTrader:
     async def run_cycle(self):
         """Run one cycle of autonomous trading."""
         try:
+            # First check daily limits if enabled
+            if self.strategies[StrategyType.DAILY_LIMITS].enabled:
+                metrics = await performance_tracker.get_realtime_metrics()
+                current_pnl = metrics.get('realized_pnl', 0)
+                
+                if current_pnl is not None:
+                    daily_limits = self.strategies[StrategyType.DAILY_LIMITS]
+                    
+                    # Check loss limit
+                    if current_pnl <= daily_limits.daily_loss_limit:
+                        logger.warning(f"Daily loss limit hit! Current P&L: ${current_pnl:.2f} (limit: ${daily_limits.daily_loss_limit})")
+                        if daily_limits.stop_on_loss_limit:
+                            logger.warning("Stopping trading due to loss limit")
+                            await self.stop()
+                            return
+                    
+                    # Check profit target
+                    if current_pnl >= daily_limits.daily_profit_target:
+                        logger.info(f"Daily profit target reached! Current P&L: ${current_pnl:.2f} (target: ${daily_limits.daily_profit_target})")
+                        if daily_limits.stop_on_profit_target:
+                            logger.info("Stopping trading due to profit target")
+                            await self.stop()
+                            return
+            
             all_signals = []
             
             # Analyze existing positions
