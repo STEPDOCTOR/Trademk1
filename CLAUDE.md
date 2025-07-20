@@ -665,3 +665,32 @@ The system currently has temporary modifications for aggressive autonomous tradi
    ```
 
 **Note**: These modifications bypass authentication and normal safety checks. They should be removed before production deployment.
+
+## Project Statistics
+
+**Last Updated**: 2025-07-20
+
+### Code Metrics
+- **Total Files**: 136
+- **Total Lines of Code**: 21,872
+
+### Breakdown by Language
+- **Python (.py)**: 19,493 lines (89%)
+- **JavaScript (.js)**: 1,214 lines (6%)
+- **HTML (.html)**: 647 lines (3%)
+- **Shell Scripts (.sh)**: 1,106 lines (5%)
+- **YAML (.yaml/.yml)**: 357 lines (2%)
+
+### Key Components
+- **API Endpoints**: 18 routers
+- **Database Models**: 13 models
+- **Services**: 15+ business logic services
+- **Trading Strategies**: 7 autonomous strategies
+- **Middleware**: 4 middleware components
+- **Background Tasks**: 5 async workers
+
+### Recent Additions
+- Performance tracking system (1,404 lines)
+- Web dashboard (1,412 lines)
+- Trailing stop losses (323 lines)
+- Daily limits and safety features (285 lines)
