@@ -2,6 +2,14 @@
 
 An autonomous real-time trading platform for U.S. stocks and top-15 cryptocurrencies.
 
+## ⚡ Current Status: Aggressive Trading Mode Active
+
+The system is currently configured with ultra-aggressive autonomous trading settings that auto-start on launch:
+- **Momentum Threshold**: 0.1% (ultra-sensitive)
+- **Check Interval**: Every 15 seconds
+- **Stop Loss**: 2% | **Take Profit**: 5%
+- **Position Size**: 3% of portfolio (~$2,200)
+
 ## 🚀 Quick Start (30 seconds)
 
 ```bash
@@ -14,6 +22,9 @@ An autonomous real-time trading platform for U.S. stocks and top-15 cryptocurren
 # Option 3: Use Make commands
 make setup  # First time only
 make start  # Start services
+
+# Option 4: Activate aggressive bot (currently auto-starts)
+python3 ACTIVATE_BOT.py
 ```
 
 ## Features
@@ -129,6 +140,21 @@ make redis-cli  # Redis CLI
 make positions
 make portfolio
 make orders
+```
+
+### Autonomous Trading Control
+```bash
+# Check bot status
+curl http://localhost:8000/api/v1/autonomous/status
+
+# Manual activation (if not auto-started)
+python3 ACTIVATE_BOT.py
+
+# Monitor bot activity
+docker compose logs -f app | grep -i "autonomous"
+
+# Watch position syncs
+docker compose logs -f app | grep "Synced.*positions"
 ```
 
 ## 🏗️ Architecture

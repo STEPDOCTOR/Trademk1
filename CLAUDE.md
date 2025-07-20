@@ -38,6 +38,21 @@ docker compose watch
 docker compose down
 ```
 
+#### Option 4: Aggressive Autonomous Trading Mode (Active)
+```bash
+# Currently configured with ultra-aggressive settings
+# - Momentum threshold: 0.1% (very sensitive)
+# - Check interval: 15 seconds
+# - Stop loss: 2%
+# - Take profit: 5%
+# - Auto-starts on docker compose up
+
+# To activate manually:
+python3 ACTIVATE_BOT.py
+# or
+./START_AUTONOMOUS_BOT.sh
+```
+
 ### Helper Scripts
 - `autostart.sh` - Interactive setup with user creation
 - `quickstart.sh` - Zero-config demo mode
@@ -617,3 +632,36 @@ curl http://localhost:8000/api/v1/strategies/list | jq
 6. **Performance Analytics**: Sharpe ratio, drawdown analysis, trade statistics
 
 See `STRATEGY_README.md` for detailed documentation.
+
+## Current Temporary Modifications
+
+### Aggressive Bot Mode (Active)
+The system currently has temporary modifications for aggressive autonomous trading:
+
+1. **Modified Files**:
+   - `app/main.py` - Auto-starts autonomous trader with aggressive settings
+   - `app/api/autonomous.py` - Added internal endpoint without auth
+   - `compose.yaml` - Uses temporary entrypoint that skips migrations
+
+2. **Aggressive Settings**:
+   - Momentum threshold: 0.1% (ultra-sensitive, down from 3%)
+   - Check interval: 15 seconds (down from 60 seconds)
+   - Stop loss: 2% (tighter than default 5%)
+   - Take profit: 5% (down from 15%)
+   - Position size: 3% of portfolio (~$2,200)
+   - Max positions: 25
+
+3. **Temporary Activation Scripts**:
+   - `ACTIVATE_BOT.py` - Python script to activate bot via HTTP
+   - `START_AUTONOMOUS_BOT.sh` - Shell script for bot activation
+   - Multiple other activation scripts for various methods
+
+4. **To Restore Normal Operation**:
+   ```bash
+   # Revert app/main.py to not auto-start bot
+   # Remove internal endpoint from app/api/autonomous.py
+   # Restore proper entrypoint in compose.yaml
+   # Delete temporary activation scripts
+   ```
+
+**Note**: These modifications bypass authentication and normal safety checks. They should be removed before production deployment.
