@@ -17,6 +17,8 @@ from app.services.trading.execution_engine import ExecutionEngine
 from app.db.questdb import get_questdb_pool
 from app.services.performance_tracker import performance_tracker
 from app.services.notification_service import notification_service, NotificationType
+from app.services.technical_indicators import technical_indicators
+from app.services.position_sizing import position_sizing
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,7 @@ class StrategyType(str, Enum):
     TAKE_PROFIT = "take_profit"
     DAILY_LIMITS = "daily_limits"
     TRAILING_STOP = "trailing_stop"
+    TECHNICAL_ANALYSIS = "technical_analysis"
 
 
 @dataclass
@@ -76,6 +79,7 @@ class AutonomousTrader:
             StrategyType.TAKE_PROFIT: AutonomousStrategy(StrategyType.TAKE_PROFIT),
             StrategyType.DAILY_LIMITS: AutonomousStrategy(StrategyType.DAILY_LIMITS),
             StrategyType.TRAILING_STOP: AutonomousStrategy(StrategyType.TRAILING_STOP),
+            StrategyType.TECHNICAL_ANALYSIS: AutonomousStrategy(StrategyType.TECHNICAL_ANALYSIS),
         }
         # Configure daily limits
         self.strategies[StrategyType.DAILY_LIMITS].enabled = True
@@ -88,6 +92,15 @@ class AutonomousTrader:
         self.strategies[StrategyType.TRAILING_STOP].enabled = True
         self.strategies[StrategyType.TRAILING_STOP].trail_percent = 0.02  # 2% trailing stop
         self.strategies[StrategyType.TRAILING_STOP].activate_after_profit_pct = 0.01  # Activate after 1% profit
+        
+        # Configure technical analysis
+        self.strategies[StrategyType.TECHNICAL_ANALYSIS].enabled = True
+        self.strategies[StrategyType.TECHNICAL_ANALYSIS].min_confidence = 0.6  # 60% confidence threshold
+        self.strategies[StrategyType.TECHNICAL_ANALYSIS].use_rsi = True
+        self.strategies[StrategyType.TECHNICAL_ANALYSIS].use_macd = True
+        self.strategies[StrategyType.TECHNICAL_ANALYSIS].use_volume = True
+        self.strategies[StrategyType.TECHNICAL_ANALYSIS].position_size_pct = 0.02  # 2% per position
+        self.strategies[StrategyType.TECHNICAL_ANALYSIS].max_positions = 20
         
         self.check_interval = 60  # Check every minute
         self.last_rebalance = datetime.utcnow()
@@ -123,16 +136,20 @@ class AutonomousTrader:
                     reason=f"Stop loss: {pnl_pct:.2%} loss"
                 ))
                 
-        # Take Profit Check
+        # Take Profit Check with scaling
         if self.strategies[StrategyType.TAKE_PROFIT].enabled:
             if pnl_pct > self.strategies[StrategyType.TAKE_PROFIT].take_profit_pct:
-                logger.info(f"Take profit triggered for {position.symbol}: {pnl_pct:.2%} gain")
-                signals.append(TradingSignal(
-                    symbol=position.symbol,
-                    side="sell",
-                    qty=position.qty * 0.5,  # Sell half
-                    reason=f"Take profit: {pnl_pct:.2%} gain"
-                ))
+                # Use position sizing service for scale-out strategy
+                sell_qty = position_sizing.scale_out_strategy(position.qty, pnl_pct / 100)
+                
+                if sell_qty > 0:
+                    logger.info(f"Take profit triggered for {position.symbol}: {pnl_pct:.2%} gain, selling {sell_qty} shares")
+                    signals.append(TradingSignal(
+                        symbol=position.symbol,
+                        side="sell",
+                        qty=int(sell_qty),
+                        reason=f"Take profit: {pnl_pct:.2%} gain (scaled exit)"
+                    ))
                 
         # Momentum Analysis
         if self.strategies[StrategyType.MOMENTUM].enabled and len(price_data) > 10:
@@ -145,6 +162,24 @@ class AutonomousTrader:
                     qty=position.qty * 0.25,  # Trim 25%
                     reason=f"Negative momentum: {momentum:.2%}"
                 ))
+        
+        # Technical Analysis
+        if self.strategies[StrategyType.TECHNICAL_ANALYSIS].enabled:
+            tech_signals = await technical_indicators.get_technical_signals(position.symbol)
+            if tech_signals:
+                # Check for strong sell signals
+                if (tech_signals.overall_signal in ["sell", "strong_sell"] and 
+                    tech_signals.confidence >= self.strategies[StrategyType.TECHNICAL_ANALYSIS].min_confidence):
+                    logger.info(
+                        f"Technical sell signal for {position.symbol}: "
+                        f"{tech_signals.overall_signal} (confidence: {tech_signals.confidence:.2f})"
+                    )
+                    signals.append(TradingSignal(
+                        symbol=position.symbol,
+                        side="sell",
+                        qty=position.qty * 0.5,  # Sell half on technical signal
+                        reason=f"Technical: {tech_signals.overall_signal} (RSI:{tech_signals.rsi:.0f}, MACD:{tech_signals.macd_cross})"
+                    ))
                 
         return signals
         
@@ -152,45 +187,97 @@ class AutonomousTrader:
         """Find new trading opportunities."""
         signals = []
         
-        if not self.strategies[StrategyType.MOMENTUM].enabled:
-            return signals
-            
         # Get account info
         account_info = await self.execution_engine.alpaca_client.get_account()
-        buying_power = account_info["buying_power"]
+        buying_power = float(account_info["buying_power"])
+        portfolio_value = float(account_info["portfolio_value"])
         
         # Get current positions
         async with optimized_db.get_session() as db:
             result = await db.execute(
                 select(Position).where(Position.qty > 0)
             )
-            current_positions = {pos.symbol for pos in result.scalars().all()}
+            positions_list = list(result.scalars().all())
+            current_positions = {pos.symbol for pos in positions_list}
+            num_positions = len(positions_list)
             
             # Don't exceed max positions
-            if len(current_positions) >= self.strategies[StrategyType.MOMENTUM].max_positions:
+            max_positions = max(
+                self.strategies[StrategyType.MOMENTUM].max_positions,
+                self.strategies[StrategyType.TECHNICAL_ANALYSIS].max_positions if hasattr(self.strategies[StrategyType.TECHNICAL_ANALYSIS], 'max_positions') else 20
+            )
+            if num_positions >= max_positions:
                 return signals
-                
-        # Check top movers
-        top_movers = await self._get_top_movers()
         
-        for symbol, momentum in top_movers[:5]:  # Top 5 movers
-            if symbol in current_positions:
-                continue
+        # Technical Analysis opportunities
+        if self.strategies[StrategyType.TECHNICAL_ANALYSIS].enabled:
+            # Get symbols to analyze
+            async with optimized_db.get_session() as db:
+                result = await db.execute(
+                    select(Symbol).where(Symbol.is_active == True)
+                )
+                symbols = [sym.ticker for sym in result.scalars().all() if sym.ticker not in current_positions]
+            
+            # Scan for technical opportunities
+            tech_opportunities = await technical_indicators.scan_for_opportunities(symbols[:30])  # Limit to 30 for performance
+            
+            for tech_signal in tech_opportunities[:3]:  # Top 3 opportunities
+                if tech_signal.confidence >= self.strategies[StrategyType.TECHNICAL_ANALYSIS].min_confidence:
+                    # Use position sizing service
+                    size_recommendation = await position_sizing.calculate_position_size(
+                        symbol=tech_signal.symbol,
+                        account_value=portfolio_value,
+                        current_price=tech_signal.current_price,
+                        signal_confidence=tech_signal.confidence,
+                        existing_positions=num_positions,
+                        max_positions=max_positions,
+                        risk_per_trade=0.01  # 1% risk per trade
+                    )
+                    
+                    if size_recommendation.shares > 0:
+                        signals.append(TradingSignal(
+                            symbol=tech_signal.symbol,
+                            side="buy",
+                            qty=size_recommendation.shares,
+                            reason=f"Technical buy: {tech_signal.overall_signal} (RSI:{tech_signal.rsi:.0f}, MACD:{tech_signal.macd_cross}, conf:{tech_signal.confidence:.2f}, risk:{size_recommendation.risk_score:.2f})"
+                        ))
+                        logger.info(f"Position sizing for {tech_signal.symbol}: {size_recommendation.shares} shares, reasoning: {', '.join(size_recommendation.reasoning)}")
                 
-            # Calculate position size
-            position_value = buying_power * self.strategies[StrategyType.MOMENTUM].position_size_pct
-            price = await self._get_latest_price(symbol)
-            if not price:
-                continue
+        # Momentum opportunities
+        if self.strategies[StrategyType.MOMENTUM].enabled:
+            # Check top movers
+            top_movers = await self._get_top_movers()
+            
+            for symbol, momentum in top_movers[:5]:  # Top 5 movers
+                if symbol in current_positions:
+                    continue
+                    
+                # Skip if we already have a technical signal for this symbol
+                if any(s.symbol == symbol for s in signals):
+                    continue
+                    
+                price = await self._get_latest_price(symbol)
+                if not price:
+                    continue
                 
-            qty = int(position_value / price)
-            if qty > 0:
-                signals.append(TradingSignal(
+                # Use position sizing for momentum trades too
+                size_recommendation = await position_sizing.calculate_position_size(
                     symbol=symbol,
-                    side="buy",
-                    qty=qty,
-                    reason=f"Momentum buy: {momentum:.2%} gain in 24h"
-                ))
+                    account_value=portfolio_value,
+                    current_price=price,
+                    signal_confidence=min(momentum / 0.05, 1.0),  # Convert momentum to confidence
+                    existing_positions=num_positions,
+                    max_positions=max_positions,
+                    risk_per_trade=0.01
+                )
+                
+                if size_recommendation.shares > 0:
+                    signals.append(TradingSignal(
+                        symbol=symbol,
+                        side="buy",
+                        qty=size_recommendation.shares,
+                        reason=f"Momentum buy: {momentum:.2%} gain in 24h (risk:{size_recommendation.risk_score:.2f})"
+                    ))
                 
         return signals
         

@@ -31,6 +31,8 @@ from app.api.autonomous import router as autonomous_router
 from app.api.performance import router as performance_router
 from app.api.dashboard import router as dashboard_router
 from app.api.notifications import router as notifications_router
+from app.api.technical_analysis import router as technical_router
+from app.api.position_sizing import router as position_sizing_router
 from app.config.settings import settings
 from app.db.postgres import close_postgres, init_postgres
 from app.db.questdb import close_questdb, init_questdb
@@ -174,6 +176,14 @@ async def lifespan(app: FastAPI):
             max_positions=25
         )
         
+        # Enable technical analysis for smarter entries
+        autonomous_trader.update_strategy('technical_analysis',
+            enabled=True,
+            min_confidence=0.5,            # Lower threshold for aggressive mode
+            position_size_pct=0.025,       # 2.5% per position
+            max_positions=20
+        )
+        
         # Tighter risk management
         autonomous_trader.update_strategy('stop_loss',
             enabled=True,
@@ -193,10 +203,12 @@ async def lifespan(app: FastAPI):
         
         logger.info("Autonomous trader settings:")
         logger.info("  • Momentum: 0.1% threshold (ultra-sensitive)")
+        logger.info("  • Technical Analysis: RSI, MACD, Volume (50% confidence)")
+        logger.info("  • Position Sizing: Volatility-adjusted with risk management")
         logger.info("  • Check interval: 15 seconds")
-        logger.info("  • Position size: 3% (~$2,200)")
+        logger.info("  • Position size: Dynamic (0.5-5% based on risk)")
         logger.info("  • Stop loss: 2%")
-        logger.info("  • Take profit: 5%")
+        logger.info("  • Take profit: 5% (with scaled exits)")
         
         # Start autonomous trader automatically
         autonomous_trader_task = asyncio.create_task(autonomous_trader.run())
@@ -352,6 +364,12 @@ def create_app() -> FastAPI:
     
     # Notifications
     app.include_router(notifications_router)
+    
+    # Technical Analysis
+    app.include_router(technical_router)
+    
+    # Position Sizing
+    app.include_router(position_sizing_router)
     
     # Real-time and admin
     app.include_router(websocket_router)

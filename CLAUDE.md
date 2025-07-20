@@ -671,23 +671,23 @@ The system currently has temporary modifications for aggressive autonomous tradi
 **Last Updated**: 2025-07-20
 
 ### Code Metrics
-- **Total Files**: 133
-- **Total Lines of Code**: 22,482
+- **Total Files**: 136
+- **Total Lines of Code**: 23,552
 
 ### Breakdown by Language
-- **Python (.py)**: 20,085 lines (89.3%)
-- **JavaScript (.js)**: 371 lines (1.7%)
-- **HTML (.html)**: 647 lines (2.9%)
-- **Shell Scripts (.sh)**: 1,106 lines (4.9%)
-- **YAML (.yaml/.yml)**: 217 lines (1.0%)
+- **Python (.py)**: 21,173 lines (89.9%)
+- **JavaScript (.js)**: 371 lines (1.6%)
+- **HTML (.html)**: 647 lines (2.7%)
+- **Shell Scripts (.sh)**: 1,106 lines (4.7%)
+- **YAML (.yaml/.yml)**: 217 lines (0.9%)
 - **SQL (.sql)**: 38 lines (0.2%)
 - **Dockerfiles**: 18 lines (0.1%)
 
 ### Key Components
-- **API Endpoints**: 19 routers (added notifications)
+- **API Endpoints**: 21 routers (added technical analysis, position sizing)
 - **Database Models**: 13 models
-- **Services**: 16+ business logic services
-- **Trading Strategies**: 7 autonomous strategies
+- **Services**: 18+ business logic services
+- **Trading Strategies**: 8 autonomous strategies (added technical analysis)
 - **Middleware**: 4 middleware components
 - **Background Tasks**: 5 async workers
 
@@ -697,3 +697,5 @@ The system currently has temporary modifications for aggressive autonomous tradi
 - Trailing stop losses (323 lines)
 - Daily limits and safety features (285 lines)
 - Telegram/Discord notifications (556 lines)
+- Technical indicators service (427 lines)
+- Position sizing service (341 lines)
