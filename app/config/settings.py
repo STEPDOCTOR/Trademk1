@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     ALPACA_PAPER_BASE_URL: str = "https://paper-api.alpaca.markets"
     ALPACA_KEY_ID: Optional[str] = None
     ALPACA_SECRET_KEY: Optional[str] = None
+    
+    # Coinbase API
+    COINBASE_API_KEY: Optional[str] = None
+    COINBASE_API_SECRET: Optional[str] = None
+    
+    # Kraken API
+    KRAKEN_API_KEY: Optional[str] = None
+    KRAKEN_API_SECRET: Optional[str] = None
 
 
 settings = Settings()

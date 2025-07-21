@@ -37,3 +37,22 @@ psutil==5.9.6
 
 # Additional utilities
 email-validator==2.1.0
+
+# Machine Learning
+scikit-learn==1.3.2
+joblib==1.3.2
+scipy==1.11.4
+statsmodels==0.14.1
+
+# News and Sentiment Analysis
+textblob==0.17.1
+yfinance==0.2.33
+newsapi-python==0.2.7
+
+# Additional Trading Features
+ta==0.11.0  # Technical Analysis library
+pandas-ta==0.3.14b0  # More technical indicators
+
+# Remote Control Bots
+discord.py==2.3.2
+python-telegram-bot==20.7

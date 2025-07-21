@@ -123,10 +123,26 @@ This project uses Python 3.12.
 │   │   ├── base.py           # Abstract strategy base classes
 │   │   ├── sma_crossover.py  # SMA crossover strategy
 │   │   ├── momentum.py       # Momentum strategy
+│   │   ├── pairs_trader.py   # Pairs trading strategy
+│   │   ├── mean_reversion.py # Mean reversion strategy
 │   │   ├── backtesting.py    # Backtesting engine
 │   │   ├── risk_manager.py   # Advanced risk management
 │   │   ├── portfolio_manager.py # Multi-strategy management
 │   │   └── autonomous_trader.py # Autonomous trading system
+│   ├── options/      # Options trading
+│   │   └── options_trader.py # Options strategies and Greeks
+│   ├── exchanges/    # Exchange integrations
+│   │   ├── coinbase_client.py # Coinbase API client
+│   │   └── kraken_client.py   # Kraken API client
+│   ├── ml/           # Machine learning
+│   │   └── price_predictor.py # ML price prediction
+│   ├── futures/      # Futures trading
+│   │   └── futures_trader.py  # Futures strategies
+│   ├── news/         # News analysis
+│   │   └── news_trader.py     # News sentiment trading
+│   ├── remote_control/ # Remote control bots
+│   │   ├── discord_bot.py     # Discord bot integration
+│   │   └── telegram_bot.py    # Telegram bot integration
 │   ├── cache.py      # Redis caching service
 │   ├── portfolio_analytics.py # Portfolio performance analytics
 │   ├── notifications.py # User notification system
@@ -475,17 +491,92 @@ Configure in `.env` file (see `.env.example`):
   - ✅ Momentum Trading (3% threshold, configurable)
   - ✅ Portfolio Rebalancing (10% deviation threshold)
   - ✅ Mean Reversion Framework
+  - ✅ Trailing Stop Loss
+  - ✅ Technical Analysis Integration
 - ✅ **Smart Features**
   - ✅ Market hours validation for stocks
   - ✅ Partial position management
   - ✅ Risk-based position sizing (2% per position)
-  - ✅ Maximum position limits (20 positions)
+  - ✅ Maximum position limits (20-30 positions)
   - ✅ Automatic error recovery and reconnection
 - ✅ **API Control**
   - ✅ Start/stop autonomous trading
   - ✅ Configure strategies independently
   - ✅ Real-time status monitoring
   - ✅ Force immediate trading cycles
+
+### Phase 6 - Advanced Trading Features (Complete)
+- ✅ **Options Trading**
+  - ✅ Black-Scholes pricing model
+  - ✅ Greeks calculations (Delta, Gamma, Theta, Vega, Rho)
+  - ✅ Options strategies (Covered Calls, Cash-Secured Puts, Spreads)
+  - ✅ Options chain analysis
+- ✅ **Pairs Trading**
+  - ✅ Statistical arbitrage with cointegration testing
+  - ✅ Dynamic hedge ratio calculation
+  - ✅ Sector-based pair selection
+  - ✅ Mean reversion signals
+- ✅ **Market Making**
+  - ✅ Automated liquidity provision
+  - ✅ Dynamic spread adjustment
+  - ✅ Inventory risk management
+  - ✅ Microprice calculations
+- ✅ **Multi-Exchange Arbitrage**
+  - ✅ Cross-exchange arbitrage detection
+  - ✅ Triangular arbitrage
+  - ✅ Statistical arbitrage
+  - ✅ Futures-spot arbitrage
+- ✅ **Exchange Integrations**
+  - ✅ Coinbase Pro API client
+  - ✅ Kraken API client
+  - ✅ Unified order routing
+  - ✅ Best execution algorithms
+- ✅ **Machine Learning Predictions**
+  - ✅ Random Forest price prediction
+  - ✅ Feature engineering pipeline
+  - ✅ Continuous model training
+  - ✅ Multi-timeframe predictions
+  - ✅ Confidence scoring
+- ✅ **Futures Trading**
+  - ✅ Calendar spread strategies
+  - ✅ Roll optimization
+  - ✅ Basis trading
+  - ✅ Contract management
+- ✅ **News-Based Trading**
+  - ✅ Real-time news sentiment analysis
+  - ✅ TextBlob integration
+  - ✅ Multi-source news aggregation
+  - ✅ Relevance scoring
+- ✅ **Mean Reversion Strategies**
+  - ✅ Bollinger Bands integration
+  - ✅ RSI-based signals
+  - ✅ Z-score calculations
+  - ✅ Dynamic position sizing
+
+### Phase 7 - Remote Control & Automation (Complete)
+- ✅ **Easy Activation Methods**
+  - ✅ One-click feature activation (`ACTIVATE_FEATURES.py`)
+  - ✅ Interactive control panel (`control_panel.py`)
+  - ✅ Pre-configured aggressive/conservative modes
+  - ✅ Batch feature activation
+- ✅ **Discord Bot Integration**
+  - ✅ Push-button control interface
+  - ✅ Persistent UI views
+  - ✅ Real-time status updates
+  - ✅ Position and performance monitoring
+  - ✅ Strategy mode switching
+- ✅ **Telegram Bot Integration**
+  - ✅ Inline keyboard controls
+  - ✅ Command-based interface
+  - ✅ Mobile-friendly design
+  - ✅ Notification system
+- ✅ **Remote Control Features**
+  - ✅ Start/stop trading without terminal
+  - ✅ Switch between trading modes
+  - ✅ Enable/disable features remotely
+  - ✅ View positions and P&L
+  - ✅ Force trading cycles
+  - ✅ Performance analytics
 
 ## Trading Symbols
 
@@ -524,20 +615,17 @@ curl -X PATCH http://localhost:8000/api/v1/autonomous/strategy/stop_loss \
 
 ## TODO/Roadmap
 
-### Phase 6 - Advanced Features (Next)
-- [ ] Machine learning price prediction models
-- [ ] Sentiment analysis from news/social media
-- [ ] Advanced order types (stop-loss, trailing stop)
-- [ ] Multi-exchange arbitrage detection
-- [ ] Custom technical indicators framework
-- [ ] Strategy marketplace
-
-### Phase 7 - Enterprise Features
+### Phase 8 - Enterprise Features (Next)
 - [ ] Multi-tenant support
 - [ ] Advanced compliance reporting
 - [ ] Integration with traditional brokers
 - [ ] Custom webhook integrations
 - [ ] White-label support
+- [ ] Voice command interface
+- [ ] Mobile app API
+- [ ] Social trading features
+- [ ] Copy trading
+- [ ] Tax reporting automation
 
 ### Infrastructure Enhancements
 - [ ] Kubernetes deployment manifests
@@ -557,12 +645,11 @@ curl -X PATCH http://localhost:8000/api/v1/autonomous/strategy/stop_loss \
 - **Compliance**: Complete audit trails, security monitoring
 - **Developer Experience**: Full API documentation, versioning, examples
 
-### Future Enhancements (Optional)
-- Email notification delivery (SMTP integration)
-- Advanced charting and technical indicators
-- Mobile app API endpoints
-- Third-party broker integrations beyond Alpaca
-- Machine learning strategy recommendations
+### Activation & Control Scripts
+- `ACTIVATE_FEATURES.py` - One-click feature activation menu
+- `control_panel.py` - Interactive control panel for all features
+- `start_remote_control.py` - Launch Discord/Telegram bots
+- `REMOTE_CONTROL_SETUP.md` - Setup guide for remote control
 
 ## Order Management System (OMS)
 
@@ -635,36 +722,32 @@ See `STRATEGY_README.md` for detailed documentation.
 
 ## Current Temporary Modifications
 
-### Aggressive Bot Mode (Active)
-The system currently has temporary modifications for aggressive autonomous trading:
+### Remote Control Features
 
-1. **Modified Files**:
-   - `app/main.py` - Auto-starts autonomous trader with aggressive settings
-   - `app/api/autonomous.py` - Added internal endpoint without auth
-   - `compose.yaml` - Uses temporary entrypoint that skips migrations
+#### Discord Bot Control
+- Start/stop trading with buttons
+- Switch between aggressive/conservative modes
+- Enable/disable ML and news trading
+- View positions and performance
+- Persistent UI that doesn't timeout
 
-2. **Aggressive Settings**:
-   - Momentum threshold: 0.1% (ultra-sensitive, down from 3%)
-   - Check interval: 15 seconds (down from 60 seconds)
-   - Stop loss: 2% (tighter than default 5%)
-   - Take profit: 5% (down from 15%)
-   - Position size: 3% of portfolio (~$2,200)
-   - Max positions: 25
+#### Telegram Bot Control
+- Full control via chat commands
+- Inline keyboard for easy access
+- Mobile-friendly interface
+- Real-time notifications
 
-3. **Temporary Activation Scripts**:
-   - `ACTIVATE_BOT.py` - Python script to activate bot via HTTP
-   - `START_AUTONOMOUS_BOT.sh` - Shell script for bot activation
-   - Multiple other activation scripts for various methods
+#### Quick Setup
+```bash
+# Add to .env
+DISCORD_BOT_TOKEN=your_token
+TELEGRAM_BOT_TOKEN=your_token
 
-4. **To Restore Normal Operation**:
-   ```bash
-   # Revert app/main.py to not auto-start bot
-   # Remove internal endpoint from app/api/autonomous.py
-   # Restore proper entrypoint in compose.yaml
-   # Delete temporary activation scripts
-   ```
+# Start remote control
+./start_remote_control.py
+```
 
-**Note**: These modifications bypass authentication and normal safety checks. They should be removed before production deployment.
+See `REMOTE_CONTROL_SETUP.md` for detailed setup instructions.
 
 ## Project Statistics
 
@@ -684,21 +767,25 @@ The system currently has temporary modifications for aggressive autonomous tradi
 - **Dockerfiles**: 18 lines (0.1%)
 
 ### Key Components
-- **API Endpoints**: 23 routers (added market sentiment)
-- **Database Models**: 13 models
-- **Services**: 20+ business logic services
-- **Trading Strategies**: 8 autonomous strategies (with sentiment analysis)
+- **API Endpoints**: 23 routers
+- **Database Models**: 15 models (added options, futures)
+- **Services**: 30+ business logic services
+- **Trading Strategies**: 15+ strategies (options, pairs, ML, news)
+- **Exchange Integrations**: 4 (Alpaca, Binance, Coinbase, Kraken)
+- **Remote Control**: Discord & Telegram bots
 - **Middleware**: 4 middleware components
-- **Background Tasks**: 5 async workers
+- **Background Tasks**: 8 async workers
 
-### Recent Additions
-- Performance tracking system (1,404 lines)
-- Web dashboard (1,412 lines)
-- Trailing stop losses (323 lines)
-- Daily limits and safety features (285 lines)
-- Telegram/Discord notifications (556 lines)
-- Technical indicators service (427 lines)
-- Position sizing service (341 lines)
-- Backtesting engine (655 lines)
-- Backtest viewer UI (461 lines)
-- Market sentiment analysis (840 lines)
+### Major Features Added
+- Options trading with Greeks calculations
+- Pairs trading with cointegration
+- Market making strategies
+- Multi-exchange arbitrage detection
+- Machine learning price prediction
+- Futures trading support
+- News-based sentiment trading
+- Mean reversion strategies
+- Discord bot remote control
+- Telegram bot remote control
+- One-click feature activation
+- Interactive control panel

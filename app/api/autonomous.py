@@ -23,6 +23,9 @@ class StrategyConfig(BaseModel):
     momentum_lookback_hours: Optional[int] = Field(None, ge=1, le=168)
     momentum_threshold: Optional[float] = Field(None, ge=0.001, le=0.5)
     rebalance_threshold: Optional[float] = Field(None, ge=0.01, le=0.5)
+    # ML-specific fields
+    min_confidence: Optional[float] = Field(None, ge=0.5, le=1.0)
+    min_return: Optional[float] = Field(None, ge=0.001, le=0.1)
 
 
 class AutonomousStatus(BaseModel):
@@ -50,13 +53,15 @@ async def get_autonomous_status(
         strategies={
             strategy_type.value: {
                 "enabled": config.enabled,
-                "position_size_pct": config.position_size_pct,
-                "max_positions": config.max_positions,
-                "stop_loss_pct": config.stop_loss_pct,
-                "take_profit_pct": config.take_profit_pct,
-                "momentum_lookback_hours": config.momentum_lookback_hours,
-                "momentum_threshold": config.momentum_threshold,
-                "rebalance_threshold": config.rebalance_threshold,
+                "position_size_pct": getattr(config, "position_size_pct", None),
+                "max_positions": getattr(config, "max_positions", None),
+                "stop_loss_pct": getattr(config, "stop_loss_pct", None),
+                "take_profit_pct": getattr(config, "take_profit_pct", None),
+                "momentum_lookback_hours": getattr(config, "momentum_lookback_hours", None),
+                "momentum_threshold": getattr(config, "momentum_threshold", None),
+                "rebalance_threshold": getattr(config, "rebalance_threshold", None),
+                "min_confidence": getattr(config, "min_confidence", None),
+                "min_return": getattr(config, "min_return", None),
             }
             for strategy_type, config in trader.strategies.items()
         },
@@ -125,13 +130,15 @@ async def update_strategy_config(
         "updated": True,
         "config": {
             "enabled": updated_config.enabled,
-            "position_size_pct": updated_config.position_size_pct,
-            "max_positions": updated_config.max_positions,
-            "stop_loss_pct": updated_config.stop_loss_pct,
-            "take_profit_pct": updated_config.take_profit_pct,
-            "momentum_lookback_hours": updated_config.momentum_lookback_hours,
-            "momentum_threshold": updated_config.momentum_threshold,
-            "rebalance_threshold": updated_config.rebalance_threshold,
+            "position_size_pct": getattr(updated_config, "position_size_pct", None),
+            "max_positions": getattr(updated_config, "max_positions", None),
+            "stop_loss_pct": getattr(updated_config, "stop_loss_pct", None),
+            "take_profit_pct": getattr(updated_config, "take_profit_pct", None),
+            "momentum_lookback_hours": getattr(updated_config, "momentum_lookback_hours", None),
+            "momentum_threshold": getattr(updated_config, "momentum_threshold", None),
+            "rebalance_threshold": getattr(updated_config, "rebalance_threshold", None),
+            "min_confidence": getattr(updated_config, "min_confidence", None),
+            "min_return": getattr(updated_config, "min_return", None),
         }
     }
 

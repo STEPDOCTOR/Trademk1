@@ -20,6 +20,7 @@ from app.services.notification_service import notification_service, Notification
 from app.services.technical_indicators import technical_indicators
 from app.services.position_sizing import position_sizing
 from app.services.market_sentiment import market_sentiment_service, MarketSentiment
+from app.services.ml import price_predictor
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class StrategyType(str, Enum):
     DAILY_LIMITS = "daily_limits"
     TRAILING_STOP = "trailing_stop"
     TECHNICAL_ANALYSIS = "technical_analysis"
+    ML_PREDICTION = "ml_prediction"
 
 
 @dataclass
@@ -81,6 +83,7 @@ class AutonomousTrader:
             StrategyType.DAILY_LIMITS: AutonomousStrategy(StrategyType.DAILY_LIMITS),
             StrategyType.TRAILING_STOP: AutonomousStrategy(StrategyType.TRAILING_STOP),
             StrategyType.TECHNICAL_ANALYSIS: AutonomousStrategy(StrategyType.TECHNICAL_ANALYSIS),
+            StrategyType.ML_PREDICTION: AutonomousStrategy(StrategyType.ML_PREDICTION),
         }
         # Configure daily limits
         self.strategies[StrategyType.DAILY_LIMITS].enabled = True
@@ -102,6 +105,12 @@ class AutonomousTrader:
         self.strategies[StrategyType.TECHNICAL_ANALYSIS].use_volume = True
         self.strategies[StrategyType.TECHNICAL_ANALYSIS].position_size_pct = 0.02  # 2% per position
         self.strategies[StrategyType.TECHNICAL_ANALYSIS].max_positions = 20
+        
+        # Configure ML predictions
+        self.strategies[StrategyType.ML_PREDICTION].enabled = False  # Disabled by default until models trained
+        self.strategies[StrategyType.ML_PREDICTION].min_confidence = 0.75  # 75% confidence minimum
+        self.strategies[StrategyType.ML_PREDICTION].min_return = 0.003  # 0.3% minimum predicted return
+        self.strategies[StrategyType.ML_PREDICTION].max_positions = 5  # Max 5 ML positions
         
         self.check_interval = 60  # Check every minute
         self.last_rebalance = datetime.utcnow()
@@ -181,6 +190,33 @@ class AutonomousTrader:
                         qty=position.qty * 0.5,  # Sell half on technical signal
                         reason=f"Technical: {tech_signals.overall_signal} (RSI:{tech_signals.rsi:.0f}, MACD:{tech_signals.macd_cross})"
                     ))
+        
+        # ML Prediction for exits
+        if self.strategies[StrategyType.ML_PREDICTION].enabled:
+            # Get ML prediction
+            ml_signals = await price_predictor.generate_signals(
+                [position.symbol],
+                min_confidence=self.strategies[StrategyType.ML_PREDICTION].min_confidence,
+                min_return=0.001  # Lower threshold for exit signals
+            )
+            
+            if ml_signals and ml_signals[0].action == "sell":
+                ml_signal = ml_signals[0]
+                # Sell if strong negative prediction
+                if ml_signal.predicted_return < -0.005:  # -0.5% or worse
+                    signals.append(TradingSignal(
+                        symbol=position.symbol,
+                        side="sell",
+                        qty=position.qty,  # Sell all
+                        reason=f"ML sell: {ml_signal.predicted_return:.2%} decline expected (conf: {ml_signal.confidence:.1%})"
+                    ))
+                elif ml_signal.predicted_return < -0.002:  # -0.2% or worse
+                    signals.append(TradingSignal(
+                        symbol=position.symbol,
+                        side="sell",
+                        qty=int(position.qty * 0.5),  # Sell half
+                        reason=f"ML partial sell: {ml_signal.predicted_return:.2%} decline expected"
+                    ))
                 
         return signals
         
@@ -205,7 +241,8 @@ class AutonomousTrader:
             # Don't exceed max positions
             max_positions = max(
                 self.strategies[StrategyType.MOMENTUM].max_positions,
-                self.strategies[StrategyType.TECHNICAL_ANALYSIS].max_positions if hasattr(self.strategies[StrategyType.TECHNICAL_ANALYSIS], 'max_positions') else 20
+                self.strategies[StrategyType.TECHNICAL_ANALYSIS].max_positions if hasattr(self.strategies[StrategyType.TECHNICAL_ANALYSIS], 'max_positions') else 20,
+                self.strategies[StrategyType.ML_PREDICTION].max_positions if hasattr(self.strategies[StrategyType.ML_PREDICTION], 'max_positions') else 5
             )
             if num_positions >= max_positions:
                 return signals
@@ -289,6 +326,52 @@ class AutonomousTrader:
                         qty=size_recommendation.shares,
                         reason=f"Momentum buy: {momentum:.2%} gain in 24h (risk:{size_recommendation.risk_score:.2f})"
                     ))
+        
+        # ML Prediction opportunities
+        if self.strategies[StrategyType.ML_PREDICTION].enabled:
+            # Get symbols for ML analysis
+            async with optimized_db.get_session() as db:
+                result = await db.execute(
+                    select(Symbol).where(Symbol.is_active == True)
+                )
+                all_symbols = [sym.ticker for sym in result.scalars().all()]
+            
+            # Get ML signals
+            ml_symbols = [s for s in all_symbols[:20] if s not in current_positions]  # Limit to 20 symbols
+            ml_signals = await price_predictor.generate_signals(
+                ml_symbols,
+                min_confidence=self.strategies[StrategyType.ML_PREDICTION].min_confidence,
+                min_return=self.strategies[StrategyType.ML_PREDICTION].min_return
+            )
+            
+            for ml_signal in ml_signals[:3]:  # Top 3 ML predictions
+                if ml_signal.action == "buy":
+                    # Skip if we already have a signal for this symbol
+                    if any(s.symbol == ml_signal.symbol for s in signals):
+                        continue
+                        
+                    price = await self._get_latest_price(ml_signal.symbol)
+                    if not price:
+                        continue
+                    
+                    # Use position sizing with ML confidence
+                    size_recommendation = await position_sizing.calculate_position_size(
+                        symbol=ml_signal.symbol,
+                        account_value=portfolio_value,
+                        current_price=price,
+                        signal_confidence=ml_signal.confidence,
+                        existing_positions=num_positions,
+                        max_positions=max_positions,
+                        risk_per_trade=0.01
+                    )
+                    
+                    if size_recommendation.shares > 0:
+                        signals.append(TradingSignal(
+                            symbol=ml_signal.symbol,
+                            side="buy",
+                            qty=size_recommendation.shares,
+                            reason=f"ML prediction: {ml_signal.predicted_return:.2%} return expected, confidence {ml_signal.confidence:.1%}"
+                        ))
                 
         return signals
         
